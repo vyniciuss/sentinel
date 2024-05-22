@@ -1,5 +1,4 @@
 {
-  "flowType": "onetoone",
   "sparkConfigurations": {
     "udfs": [
       {
@@ -78,8 +77,8 @@
       "name": "transaction",
       "tableName": "transaction",
       "tableComment": "This table stores transaction information.",
-      "database": "onboarding",
-      "catalog": "pci_ext",
+      "database": "db2",
+      "catalog": "cat2",
       "createTable": false,
       "pathDatabase": "c:/user/user1",
       "useTenantAndCountry": true,
@@ -112,7 +111,7 @@
         "overwriteSchema": "true",
         "partitionOverwriteMode": "dynamic"
       },
-      "sourceType": "mongo",
+      "sourceType": "general",
       "format": "json",
       "mergeStatement": {
         "aliasSource": "source",

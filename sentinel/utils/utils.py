@@ -1,4 +1,3 @@
-# utils.py
 """
 Utility functions for the project.
 """
@@ -9,7 +8,15 @@ from pyspark.sql import SparkSession
 from sentinel.models import Config
 
 
-def load_config(file_path: str, spark: SparkSession = None) -> Config:
+def load_files(file_path, spark: SparkSession = None):
+    if not spark:
+        spark = SparkSession.builder.getOrCreate()
+    df = spark.read.text(file_path)
+    json_str = ''.join([row.value for row in df.collect()])
+    return json.loads(json_str)
+
+
+def read_config_file(file_path: str, spark: SparkSession = None) -> Config:
     """
     Load configuration from a JSON file in DBFS.
 
@@ -21,10 +28,6 @@ def load_config(file_path: str, spark: SparkSession = None) -> Config:
         :param file_path:
         :param spark:
     """
-    if not spark:
-        spark = SparkSession.builder.getOrCreate()
-    df = spark.read.text(file_path)
-    json_str = ''.join([row.value for row in df.collect()])
-    data = json.loads(json_str)
+    data = load_files(file_path, spark)
     config = Config(**data)
     return config

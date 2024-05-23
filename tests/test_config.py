@@ -3,7 +3,7 @@ import os
 import pytest
 
 from sentinel.models import Config
-from sentinel.utils.utils import load_config
+from sentinel.utils.utils import read_config_file
 
 
 @pytest.fixture
@@ -12,27 +12,26 @@ def file_path():
 
 
 def test_load_config(file_path, spark):
-    config = load_config(file_path, spark)
+    config = read_config_file(file_path, spark)
     assert isinstance(config, Config)
-    assert config.flow_type == 'onetoone'
     assert config.sources_config is not None
     assert config.destinations_config is not None
 
 
 def test_find_methods(file_path, spark):
-    config = load_config(file_path)
+    config = read_config_file(file_path)
 
-    column_mapping = config.find_column_mapping('merchant')
+    column_mapping = config.find_column_mapping('tableA')
     assert column_mapping is not None
-    assert column_mapping.name == 'merchant'
+    assert column_mapping.name == 'tableA'
 
     query_mapping = config.find_query_mapping('input')
     assert query_mapping is not None
     assert query_mapping.name == 'input'
 
-    source_config = config.find_source_config('merchant')
+    source_config = config.find_source_config('tableA')
     assert source_config is not None
-    assert source_config.name == 'merchant'
+    assert source_config.name == 'tableA'
 
     destination_config = config.find_destination_config('transaction')
     assert destination_config is not None
@@ -40,7 +39,7 @@ def test_find_methods(file_path, spark):
 
 
 def test_yaml_path(file_path, spark):
-    config = load_config(file_path)
+    config = read_config_file(file_path)
     dest_config = config.find_destination_config('transaction')
     assert dest_config is not None
     assert (

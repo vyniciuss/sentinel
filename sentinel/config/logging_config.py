@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -36,3 +37,20 @@ logger.add(
     compression='zip',
     serialize=False,
 )
+
+# Integração do Loguru com o logging padrão do Python
+class InterceptHandler(logging.Handler):
+    def emit(self, record):
+        # Obter o logger do Loguru e repassar as mensagens de log
+        logger_opt = logger.opt(depth=6, exception=record.exc_info)
+        logger_opt.log(record.levelname, record.getMessage())
+
+
+# Redefinir configuração do logger padrão do Python
+logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO)
+logging.getLogger().handlers = [InterceptHandler()]
+
+for handler in logging.root.handlers[:]:
+    logging.root.removeHandler(handler)
+
+logging.getLogger().addHandler(InterceptHandler())

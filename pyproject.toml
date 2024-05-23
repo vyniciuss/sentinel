@@ -5,12 +5,18 @@ description = ""
 authors = ["vinicius <vyniciuss@gmail.com>"]
 readme = "README.md"
 
+[tool.poetry.scripts]
+sentinel = "sentinel.main:app"
+
 [tool.poetry.dependencies]
 python = "^3.11"
 pydantic = "^2.7.1"
 loguru = "^0.7.2"
 pyspark = "^3.5.1"
 delta-spark = "^3.2.0"
+typer = "^0.12.3"
+rich = "^13.7.1"
+great-expectations = "^0.18.14"
 
 
 [tool.poetry.group.dev.dependencies]

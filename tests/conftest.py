@@ -8,9 +8,7 @@ import pytest
 from delta import configure_spark_with_delta_pip
 from pyspark.sql import SparkSession
 
-from sentinel.config.logging_config import (
-    logger,
-)
+from sentinel.config.logging_config import logger
 
 TEMPDIR = path.join(os.getcwd(), 'tmp', f'spark_temp_dir_{uuid.uuid4()}')
 

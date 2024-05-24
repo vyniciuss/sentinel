@@ -11,6 +11,7 @@ from sentinel.utils.string_utils import to_snake
 from .base import SparkConfigurations
 from .column_mapping import ColumnMapping
 from .destination_config import DestinationConfig
+from .expectations import Expectations
 from .query_mapping import QueryMapping
 from .source_config import SourceConfig
 
@@ -35,6 +36,9 @@ class Config(BaseModel):
     )
     query_mappings: Optional[List[QueryMapping]] = Field(
         None, alias='queryMappings'
+    )
+    expectations: Optional[List[Expectations]] = Field(
+        None, alias='expectations'
     )
 
     class Config:

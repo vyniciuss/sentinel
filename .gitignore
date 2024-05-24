@@ -164,3 +164,4 @@ cython_debug/
 /.idea/vcs.xml
 /.idea/.gitignore
 /tmp/spark-588d9f5b-3b2b-4bc6-83ab-b4993e0e7fdb/userFiles-24623bae-c454-41eb-a950-8223e2e79324/io.delta_delta-spark_2.12-3.2.0.jar
+/.idea/git_toolbox_prj.xml

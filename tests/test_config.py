@@ -19,7 +19,7 @@ def test_load_config(file_path, spark):
 
 
 def test_find_methods(file_path, spark):
-    config = read_config_file(file_path)
+    config = read_config_file(file_path, spark)
 
     column_mapping = config.find_column_mapping('tableA')
     assert column_mapping is not None
@@ -39,7 +39,7 @@ def test_find_methods(file_path, spark):
 
 
 def test_yaml_path(file_path, spark):
-    config = read_config_file(file_path)
+    config = read_config_file(file_path, spark)
     dest_config = config.find_destination_config('transaction')
     assert dest_config is not None
     assert (

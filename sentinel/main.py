@@ -1,50 +1,75 @@
+import sys
+from inspect import Parameter, signature
+from typing import Any
+
+from pyspark.sql import SparkSession
 from rich.console import Console
 from rich.table import Table
-from typer import Argument, Context, Exit, Option, Typer
+from typer import Argument, Typer
 
-from sentinel.config.spark_context import get_spark_context
+from sentinel.config.logging_config import logger
 from sentinel.data_quality.validator import (
     create_expectation_suite,
     validate_data,
 )
-from sentinel.utils.utils import load_files
+from sentinel.utils.utils import read_config_file
 
 console = Console()
 app = Typer()
 
 
-@app.command()
-def main(
-    jsonpath: str = Argument(
-        'E:\\sentinel\\tests\\resources\\expectations.json',
-        help='Path do json de configuracao',
-    ),
-    param2: str = Argument('maior', help='Tonalidade da escala'),
-):
+def add_params_to_table(func: Any, **kwargs: Any) -> None:
     table = Table()
 
-    table.add_column('jsonpath')
-    table.add_column('param2')
-    table.add_row(*[jsonpath, param2])
+    sig = signature(func)
+    for name, param in sig.parameters.items():
+        if param.default != Parameter.empty:
+            table.add_column(name)
+
+    table.add_row(*[str(kwargs[name]) for name in kwargs])
 
     console.print(table)
 
-    spark = get_spark_context()
-    expectations = load_files(jsonpath, spark)['expectations']
-    expectation_suite = create_expectation_suite(expectations)
 
-    data = [
-        ('Alice', 30, 'single'),
-        ('Bob', 45, 'married'),
-        ('Charlie', None, 'divorced'),
-    ]
+@app.command()
+def main(
+    jsonpath: str = Argument(help='Path do json de configuracao'),
+    source_table_name: str = Argument(
+        help='The name of the table that will have the validated data'
+    ),
+    target_table_name: str = Argument(
+        help='The name of the table where the validation results will be saved.'
+    ),
+):
+    try:
+        add_params_to_table(
+            main,
+            jsonpath=jsonpath,
+            table_name=source_table_name,
+            target_table_name=target_table_name,
+        )
+        spark = SparkSession.builder.getOrCreate()
+        config = read_config_file(jsonpath, spark)
+        expectation_suite = create_expectation_suite(config.expectations)
+        spark_df = spark.table(source_table_name)
 
-    columns = ['name', 'age', 'status']
-    table_name = 'mock_table'
-    spark_df = spark.createDataFrame(data, columns)
+        result_df, success = validate_data(
+            spark, spark_df, expectation_suite, source_table_name
+        )
 
-    result_df, success = validate_data(
-        spark, spark_df, expectation_suite, table_name
-    )
-
-    result_df.show(truncate=False)
+        if success:
+            logger.info('Validation succeeded!')
+            sys.exit(0)
+        else:
+            logger.error(
+                f'An error occurred during execution! Please consult '
+                f'table {target_table_name} for more information.'
+            )
+            sys.exit(1)
+    except Exception as e:
+        logger.error(
+            f'An error occurred during execution! Please consult '
+            f'table {target_table_name} for more information.'
+        )
+        logger.info(e)
+        sys.exit(1)

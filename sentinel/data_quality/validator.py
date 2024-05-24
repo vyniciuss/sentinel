@@ -1,12 +1,15 @@
 import json
 import time
 from datetime import datetime
+from typing import List, Tuple
 
 import great_expectations as ge
+from great_expectations.core import ExpectationSuite
 from great_expectations.core.expectation_configuration import (
     ExpectationConfiguration,
 )
 from great_expectations.dataset.sparkdf_dataset import SparkDFDataset
+from pyspark.sql import DataFrame
 from pyspark.sql.types import (
     BooleanType,
     FloatType,
@@ -15,19 +18,25 @@ from pyspark.sql.types import (
     StructType,
 )
 
+from sentinel.models import Expectations
 
-def create_expectation_suite(expectations, suite_name='default_suite'):
+
+def create_expectation_suite(
+    expectations: List[Expectations], suite_name='default_suite'
+) -> ExpectationSuite:
     suite = ge.core.ExpectationSuite(expectation_suite_name=suite_name)
     for expectation in expectations:
         expectation_config = ExpectationConfiguration(
-            expectation_type=expectation['expectation_type'],
-            kwargs=expectation['kwargs'],
+            expectation_type=expectation.expectation_type,
+            kwargs=expectation.kwargs,
         )
         suite.add_expectation(expectation_config)
     return suite
 
 
-def validate_data(spark, spark_df, expectation_suite, table_name):
+def validate_data(
+    spark, spark_df, expectation_suite, table_name
+) -> Tuple[DataFrame, bool]:
     ge_df = ge.dataset.SparkDFDataset(spark_df)
     start_time = time.time()
     result = ge_df.validate(expectation_suite=expectation_suite)
@@ -38,9 +47,7 @@ def validate_data(spark, spark_df, expectation_suite, table_name):
     for res in result['results']:
         record = {
             'expectation_type': res['expectation_config']['expectation_type'],
-            'kwargs': json.dumps(
-                res['expectation_config']['kwargs']
-            ),  # Converte kwargs para string JSON
+            'kwargs': json.dumps(res['expectation_config']['kwargs']),
             'success': res['success'],
             'error_message': res['result'].get('unexpected_count', None),
             'observed_value': res['result'].get('observed_value', None),

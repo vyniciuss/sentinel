@@ -26,13 +26,15 @@ share/python-wheels/
 *.egg
 MANIFEST
 tmp/
-
+*.dat
+spark-warehouse
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
-
+*/metastore_db
+metastore_db
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
@@ -165,3 +167,8 @@ cython_debug/
 /.idea/.gitignore
 /tmp/spark-588d9f5b-3b2b-4bc6-83ab-b4993e0e7fdb/userFiles-24623bae-c454-41eb-a950-8223e2e79324/io.delta_delta-spark_2.12-3.2.0.jar
 /.idea/git_toolbox_prj.xml
+/metastore_db/seg0/c1a1.dat
+/metastore_db/db.lck
+/tests/metastore_db/db.lck
+/metastore_db/log/logmirror.ctrl
+/metastore_db/README_DO_NOT_TOUCH_FILES.txt

@@ -32,12 +32,11 @@ def quiet_py4j(spark):
     s_logger_py4j = logging.getLogger('py4j.java_gateway')
     logger_py4j.setLevel(logging.FATAL)
     s_logger_py4j.setLevel(logging.FATAL)
-    spark.sparkContext.setLogLevel('fatal')
+    spark.sparkContext.setLogLevel('ERROR')
 
 
 @pytest.fixture(scope='session')
 def spark():
-
     if os.path.exists(TEMPDIR):
         try:
             shutil.rmtree(TEMPDIR, ignore_errors=True)
@@ -67,15 +66,6 @@ def spark():
 
     spark.stop()
 
-    if os.path.exists(TEMPDIR):
-        logger.info(f'Removing temporary directory: {TEMPDIR}')
-        try:
-            shutil.rmtree(TEMPDIR)
-        except Exception as e:
-            logger.error(f'Error removing temporary directory: {e}')
-    else:
-        logger.warning(f'Temporary directory not found: {TEMPDIR}')
-
 
 logging.basicConfig(level=logging.INFO)
-logging.getLogger().addHandler(logger)
+logging.getLogger().addHandler(logging.StreamHandler())

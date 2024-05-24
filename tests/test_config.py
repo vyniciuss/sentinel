@@ -36,13 +36,3 @@ def test_find_methods(file_path, spark):
     destination_config = config.find_destination_config('transaction')
     assert destination_config is not None
     assert destination_config.name == 'transaction'
-
-
-def test_yaml_path(file_path, spark):
-    config = read_config_file(file_path, spark)
-    dest_config = config.find_destination_config('transaction')
-    assert dest_config is not None
-    assert (
-        dest_config.yaml_path
-        == 'D:\\Estudos\\sentinel\\tests\\resources\\datacontract.yaml'
-    )

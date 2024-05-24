@@ -117,8 +117,7 @@
         "aliasSource": "source",
         "aliasTarget": "destiny",
         "statement": "MERGE INTO $target \n  USING $source \n ON source.country = destiny.country AND source.tenant = destiny.tenant AND source.code = destiny.code \n  WHEN MATCHED THEN \n  UPDATE SET * \n WHEN NOT MATCHED THEN \n  INSERT *"
-      },
-      "yamlPath": "D:\\Estudos\\sentinel\\tests\\resources\\datacontract.yaml"
+      }
     }
   ],
   "columnMappings": [
@@ -173,25 +172,43 @@
       ]
     }
   ],
-  "expectations": [
-    {
-      "expectation_type": "expect_column_to_exist",
-      "kwargs": {
-        "column": "name"
+  "data_quality": {
+    "great_expectations": [
+      {
+        "expectation_type": "expect_column_to_exist",
+        "kwargs": {
+          "column": "name"
+        }
+      },
+      {
+        "expectation_type": "expect_column_values_to_not_be_null",
+        "kwargs": {
+          "column": "age"
+        }
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_in_set",
+        "kwargs": {
+          "column": "status",
+          "value_set": [
+            "single",
+            "married",
+            "divorced"
+          ]
+        }
       }
-    },
-    {
-      "expectation_type": "expect_column_values_to_not_be_null",
-      "kwargs": {
-        "column": "age"
+    ],
+    "custom_expectations": [
+      {
+        "name": "total_custom",
+        "sql": "SELECT COUNT(*) from test_db.source_table where age=45 ",
+        "result": 2
+      },
+      {
+        "name": "total_custom2",
+        "sql": "SELECT COUNT(*) from test_db.source_table where age=30 ",
+        "result": 1
       }
-    },
-    {
-      "expectation_type": "expect_column_values_to_be_in_set",
-      "kwargs": {
-        "column": "status",
-        "value_set": ["single", "married", "divorced"]
-      }
-    }
-  ]
+    ]
+  }
 }

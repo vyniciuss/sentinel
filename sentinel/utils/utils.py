@@ -9,6 +9,7 @@ from pyspark.sql import SparkSession
 from rich.console import Console
 from rich.table import Table
 
+from sentinel.config.logging_config import logger
 from sentinel.models import Config
 
 console = Console()
@@ -33,6 +34,9 @@ def read_config_file(file_path: str, spark: SparkSession = None) -> Config:
         :param spark:
     """
     data = load_files(file_path, spark)
+    if data:
+        logger.info(f'--- File {file_path} was found! ---')
+
     config = Config(**data)
     return config
 

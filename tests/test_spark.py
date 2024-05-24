@@ -1,6 +1,3 @@
-from sentinel.config.logging_config import logger
-
-
 def test_spark_session(spark):
     data = [('Alice', 1), ('Bob', 2)]
     df = spark.createDataFrame(data, ['name', 'value'])

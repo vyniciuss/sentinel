@@ -1,10 +1,6 @@
 import sys
-from inspect import Parameter, signature
-from typing import Any
 
 from pyspark.sql import SparkSession
-from rich.console import Console
-from rich.table import Table
 from typer import Argument, Typer
 
 from sentinel.config.logging_config import logger
@@ -12,23 +8,9 @@ from sentinel.data_quality.validator import (
     create_expectation_suite,
     validate_data,
 )
-from sentinel.utils.utils import read_config_file
+from sentinel.utils.utils import add_params_to_table, read_config_file
 
-console = Console()
 app = Typer()
-
-
-def add_params_to_table(func: Any, **kwargs: Any) -> None:
-    table = Table()
-
-    sig = signature(func)
-    for name, param in sig.parameters.items():
-        if param.default != Parameter.empty:
-            table.add_column(name)
-
-    table.add_row(*[str(kwargs[name]) for name in kwargs])
-
-    console.print(table)
 
 
 @app.command()
@@ -55,6 +37,10 @@ def main(
 
         result_df, success = validate_data(
             spark, spark_df, expectation_suite, source_table_name
+        )
+
+        result_df.write.format('delta').mode('append').saveAsTable(
+            target_table_name
         )
 
         if success:

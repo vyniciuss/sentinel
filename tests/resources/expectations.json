@@ -1,23 +1,41 @@
 {
-  "expectations": [
-    {
-      "expectation_type": "expect_column_to_exist",
-      "kwargs": {
-        "column": "name"
+  "data_quality": {
+    "great_expectations": [
+      {
+        "expectation_type": "expect_column_to_exist",
+        "kwargs": {
+          "column": "name"
+        }
+      },
+      {
+        "expectation_type": "expect_column_values_to_not_be_null",
+        "kwargs": {
+          "column": "age"
+        }
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_in_set",
+        "kwargs": {
+          "column": "status",
+          "value_set": [
+            "single",
+            "married",
+            "divorced"
+          ]
+        }
       }
-    },
-    {
-      "expectation_type": "expect_column_values_to_not_be_null",
-      "kwargs": {
-        "column": "age"
+    ],
+    "custom_expectations": [
+      {
+        "name": "total_custom",
+        "sql": "select count(*) from table1 where ....",
+        "result": 0
+      },
+      {
+        "name": "total_custom2",
+        "sql": "select count(*) from table2 where ....",
+        "result": 0
       }
-    },
-    {
-      "expectation_type": "expect_column_values_to_be_in_set",
-      "kwargs": {
-        "column": "status",
-        "value_set": ["single", "married", "divorced"]
-      }
-    }
-  ]
+    ]
+  }
 }

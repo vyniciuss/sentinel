@@ -2,10 +2,16 @@
 Utility functions for the project.
 """
 import json
+from inspect import Parameter, signature
+from typing import Any
 
-from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import SparkSession
+from rich.console import Console
+from rich.table import Table
 
 from sentinel.models import Config
+
+console = Console()
 
 
 def load_files(file_path, spark: SparkSession = None):
@@ -31,11 +37,14 @@ def read_config_file(file_path: str, spark: SparkSession = None) -> Config:
     return config
 
 
-def write(df: DataFrame) -> None:
-    (
-        df.write.format('delta')
-        .mode('append')
-        .saveAsTable(
-            f'{layer.value}_{business.value}.{table.get_name.lower()}'
-        )
-    )
+def add_params_to_table(func: Any, **kwargs: Any) -> None:
+    table = Table()
+
+    sig = signature(func)
+    for name, param in sig.parameters.items():
+        if param.default != Parameter.empty:
+            table.add_column(name)
+
+    table.add_row(*[str(kwargs[name]) for name in kwargs])
+
+    console.print(table)

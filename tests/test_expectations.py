@@ -6,8 +6,8 @@ from sentinel.data_quality.validator import (
 from sentinel.utils.utils import read_config_file
 
 
-def test_column_presence(spark):
-    json_path = 'E:\\sentinel\\tests\\resources\\process.json'
+def test_great_expectation_validation(spark, file_path):
+    json_path = file_path
     table_name = 'contas'
     config = read_config_file(json_path, spark)
     expectation_suite = create_expectation_suite(

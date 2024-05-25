@@ -1,14 +1,5 @@
-import os
-
-import pytest
-
 from sentinel.models import Config
 from sentinel.utils.utils import read_config_file
-
-
-@pytest.fixture
-def file_path():
-    return os.path.join(os.path.dirname(__file__), 'resources', 'process.json')
 
 
 def test_load_config(file_path, spark):

@@ -42,7 +42,6 @@ def executor(
         spark = SparkSession.builder.getOrCreate()
 
     config = read_config_file(jsonpath, spark)
-    logger.info(config)
     validate_data(spark, config.data_quality, source_table_name, target_table)
 
 
@@ -102,7 +101,7 @@ def validate_great_expectations(
             'kwargs': json.dumps(res['expectation_config']['kwargs']),
             'success': res['success'],
             'error_message': res['result'].get('unexpected_count', None),
-            'observed_value': res['result'].get('observed_value', None),
+            'observed_value': str(res['result'].get('observed_value', None)),
             'severity': 'critical' if not res['success'] else 'info',
             'table_name': table_name,
             'execution_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -125,7 +124,7 @@ def validate_custom_expectations(
     spark: SparkSession,
     custom_expectations: List[CustomExpectation],
     source_table_name: str,
-) -> Tuple[Optional[DataFrame], bool]:
+) -> Tuple[DataFrame, bool]:
     """Validates data using custom SQL queries.
 
     Args:
@@ -134,12 +133,8 @@ def validate_custom_expectations(
         source_table_name (str): Name of the source table being validated.
 
     Returns:
-        Tuple[Optional[DataFrame], bool]: DataFrame with validation results and success status.
+        Tuple[DataFrame, bool]: DataFrame with validation results and success status.
     """
-    if not custom_expectations:
-        logger.info('No custom expectations provided.')
-        return None, True
-
     logger.info('Starting validation with custom expectations')
 
     records = []
@@ -147,21 +142,51 @@ def validate_custom_expectations(
 
     for custom in custom_expectations:
         sql_query = custom.sql
-        expected_result = custom.result
+        expected_columns_list = custom.expected_results
         result_df = spark.sql(sql_query)
         result = result_df.collect()
+
+        expected_column_names = set()
+        for expected_columns in expected_columns_list:
+            expected_column_names.update(expected_columns.keys())
+        expected_column_names = list(expected_column_names)
+
+        actual_columns = result_df.columns
+        missing_columns = [
+            col for col in expected_column_names if col not in actual_columns
+        ]
+        column_validation_success = not missing_columns
+
+        value_validation_success = True
+        if column_validation_success:
+            for expected in expected_columns_list:
+                match_found = any(
+                    all(
+                        row[col] == val
+                        for col, val in expected.items()
+                        if col in actual_columns
+                    )
+                    for row in result
+                )
+                if not match_found:
+                    value_validation_success = False
+                    break
+
+        success = column_validation_success and value_validation_success
 
         record = {
             'expectation_type': custom.name,
             'kwargs': json.dumps(
-                {'sql': sql_query, 'expected_result': expected_result}
+                {'sql': sql_query, 'expected_columns': expected_columns_list}
             ),
-            'success': result == expected_result,
+            'success': success,
             'error_message': None
-            if result == expected_result
-            else f'Expected {expected_result}, got {result}',
-            'observed_value': None,
-            'severity': 'critical' if result != expected_result else 'info',
+            if success
+            else f'Expected result: {expected_columns_list}, got: {result}. Expected columns: {expected_column_names}, got: {actual_columns}. Missing columns: {missing_columns}',
+            'observed_value': str(
+                json.dumps([row.asDict() for row in result])
+            ),
+            'severity': 'critical' if not success else 'info',
             'table_name': source_table_name,
             'execution_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'validation_id': f"validation_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
@@ -173,7 +198,7 @@ def validate_custom_expectations(
         }
         records.append(record)
 
-        if result != expected_result:
+        if not success:
             custom_success = False
 
     schema = generate_target_schema()
@@ -194,7 +219,7 @@ def generate_target_schema() -> StructType:
             StructField('kwargs', StringType(), True),
             StructField('success', BooleanType(), True),
             StructField('error_message', StringType(), True),
-            StructField('observed_value', FloatType(), True),
+            StructField('observed_value', StringType(), True),
             StructField('severity', StringType(), True),
             StructField('table_name', StringType(), True),
             StructField('execution_date', StringType(), True),

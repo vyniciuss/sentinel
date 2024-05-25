@@ -201,13 +201,13 @@
     "custom_expectations": [
       {
         "name": "total_custom",
-        "sql": "SELECT COUNT(*) from test_db.source_table where age=45 ",
-        "result": 2
+        "sql": "SELECT COUNT(*) as total from test_db.source_table where age=45 ",
+        "expected_results": [{"total": 2}]
       },
       {
         "name": "total_custom2",
-        "sql": "SELECT COUNT(*) from test_db.source_table where age=30 ",
-        "result": 1
+        "sql": "SELECT COUNT(*) as total, name, status from test_db.source_table group by name, status",
+        "expected_results": [{"total": 1, "name": "Alice", "status": "single"}, {"total": 1, "name": "Alice", "status": "married"}]
       }
     ]
   }

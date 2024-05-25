@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -7,7 +7,7 @@ class Expectations(BaseModel):
 
     expectation_type: Optional[str] = None
     expectation_type: Optional[str] = None
-    kwargs: Optional[Dict[str, any]] = None
+    kwargs: Optional[Dict[str, Any]] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -16,7 +16,7 @@ class Expectations(BaseModel):
 class CustomExpectation(BaseModel):
     name: Optional[str] = None
     sql: Optional[str] = None
-    result: Optional[any] = None
+    expected_results: Optional[List[Dict[str, Any]]] = None
 
     class Config:
         arbitrary_types_allowed = True

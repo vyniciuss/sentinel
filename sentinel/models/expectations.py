@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 class Expectations(BaseModel):
 
-    expectation_type: Optional[str] = None
+    expectation_type: Optional[str] = Field(None, alias='expectationType')
     kwargs: Optional[Dict[str, Any]] = None
 
     class Config:
@@ -15,7 +15,9 @@ class Expectations(BaseModel):
 class CustomExpectation(BaseModel):
     name: Optional[str] = None
     sql: Optional[str] = None
-    expected_results: Optional[List[Dict[str, Any]]] = None
+    expected_results: Optional[List[Dict[str, Any]]] = Field(
+        None, alias='expectedResults'
+    )
 
     class Config:
         arbitrary_types_allowed = True

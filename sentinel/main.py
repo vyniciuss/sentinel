@@ -3,7 +3,7 @@ import sys
 from typer import Option, Typer
 
 from sentinel.config.logging_config import logger
-from sentinel.data_quality.validator import executor
+from sentinel.data_quality.validator import evaluate
 from sentinel.exception.ValidationError import ValidationError
 from sentinel.utils.utils import add_params_to_table
 
@@ -28,7 +28,7 @@ def main(
             table_name=source_table_name,
             target_table_name=target_table_name,
         )
-        executor(jsonpath, source_table_name, target_table_name)
+        evaluate(jsonpath, source_table_name, target_table_name)
         sys.exit(0)
     except ValidationError as e:
         logger.error(e)

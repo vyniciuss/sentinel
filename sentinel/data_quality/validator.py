@@ -24,7 +24,7 @@ from sentinel.models import CustomExpectation, DataQualityConfig, Expectations
 from sentinel.utils.utils import read_config_file
 
 
-def executor(
+def evaluate(
     jsonpath: str,
     source_table_name: str,
     target_table: str,

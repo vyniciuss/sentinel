@@ -1,19 +1,4 @@
 {
-  "sparkConfigurations": {
-    "udfs": [
-      {
-        "className": "com.smps.udfs.UDFManager",
-        "methodName": "minhaUDF"
-      },
-      {
-        "className": "com.smps.udfs.UDFManager",
-        "methodName": "outraUDF"
-      }
-    ],
-    "sparkOptions": {
-      "spark.sql.sources.partitionOverwriteMode": "dynamic"
-    }
-  },
   "sourcesConfig": [
     {
       "name": "tableA",
@@ -21,23 +6,6 @@
       "tableComment": "This table stores tableA information.",
       "database": "dat1",
       "catalog": "cat1",
-      "createTable": false,
-      "pathDatabase": "c:/user/user1",
-      "useTenantAndCountry": true,
-      "customSchemas": [
-        {
-          "name": "TableA",
-          "schemaType": "cdm",
-          "purpose": "initial_load",
-          "schemaLocation": "src/test/resources/cdm/Tables/TableA.cdm.json"
-        },
-        {
-          "name": "TableB",
-          "schemaType": "cdm",
-          "purpose": "change_feed",
-          "schemaLocation": "src/test/resources/cdm/ChangeFeed/TableB.cdm.json"
-        }
-      ],
       "keys": [
         "country",
         "tenant",
@@ -47,27 +15,8 @@
         "tenant",
         "country"
       ],
-      "maskFields": [
-        "abc",
-        "cde"
-      ],
-      "cardNumbersColumns": [
-        "abc",
-        "cde"
-      ],
-      "deduplicateSortColumns": [
-        "abc",
-        "cde"
-      ],
-      "zorderColumns": [
-        "abc",
-        "cde"
-      ],
-      "pipeline": "value",
-      "sourceType": "general",
-      "format": "json",
-      "colNameFilePath": "file_path",
-      "landingOptions": {
+      "format": "delta",
+      "readOptions": {
         "ignoreMissingFiles": "true"
       }
     }
@@ -79,9 +28,6 @@
       "tableComment": "This table stores transaction information.",
       "database": "db2",
       "catalog": "cat2",
-      "createTable": false,
-      "pathDatabase": "c:/user/user1",
-      "useTenantAndCountry": true,
       "keys": [
         "country",
         "tenant",
@@ -91,103 +37,30 @@
         "tenant",
         "country"
       ],
-      "rawOptions": {
+      "writeOptions": {
         "mergeSchema": "true",
         "overwriteSchema": "true",
         "partitionOverwriteMode": "dynamic"
       },
-      "stageOptions": {
-        "mergeSchema": "true",
-        "overwriteSchema": "true",
-        "partitionOverwriteMode": "dynamic"
-      },
-      "commonOptions": {
-        "mergeSchema": "true",
-        "overwriteSchema": "true",
-        "partitionOverwriteMode": "dynamic"
-      },
-      "refinedOptions": {
-        "mergeSchema": "true",
-        "overwriteSchema": "true",
-        "partitionOverwriteMode": "dynamic"
-      },
-      "sourceType": "general",
-      "format": "json",
-      "mergeStatement": {
-        "aliasSource": "source",
-        "aliasTarget": "destiny",
-        "statement": "MERGE INTO $target \n  USING $source \n ON source.country = destiny.country AND source.tenant = destiny.tenant AND source.code = destiny.code \n  WHEN MATCHED THEN \n  UPDATE SET * \n WHEN NOT MATCHED THEN \n  INSERT *"
-      }
+      "format": "delta"
     }
   ],
-  "columnMappings": [
-    {
-      "name": "tableA",
-      "columns": [
-        {
-          "fieldName": "DerivedColumn1",
-          "aliasName": null,
-          "dataType": "Timestamp",
-          "comment": "",
-          "customTransformation": "CAST(from_unixtime((CAST(payload_creation_date_date AS BIGINT) / 1000), 'yyyy-MM-dd HH:mm:ss') AS TIMESTAMP)",
-          "isDerivedColumn": true
-        },
-        {
-          "fieldName": "payload_creation_date_date",
-          "aliasName": "creation_date_date",
-          "dataType": "Timestamp",
-          "comment": "",
-          "customTransformation": "CAST(from_unixtime((CAST(creation_date_date AS BIGINT) / 1000), 'yyyy-MM-dd HH:mm:ss') AS TIMESTAMP)"
-        }
-      ]
-    }
-  ],
-  "queryMappings": [
-    {
-      "name": "input",
-      "steps": [
-        {
-          "name": "header",
-          "sql": "select * from input where value rLIKE '^HDA.*'",
-          "createTempView": true,
-          "columnMappingName": "header"
-        },
-        {
-          "name": "detail",
-          "sql": "select * from input where value rLIKE '^DTL.*'",
-          "createTempView": true,
-          "persist": true,
-          "columnMappingName": "detail"
-        },
-        {
-          "name": "trailer",
-          "sql": "select * from input where value rLIKE '^TLA.*'",
-          "createTempView": true,
-          "columnMappingName": "trailer"
-        },
-        {
-          "name": "tb_final",
-          "sql": "select h.author,h.processing_date, h.processing_dateb, d.check_account,d.clacon,d.operation_type, d.amount,d.currency,d.reference, d.observation,t.qt_accept_deb,t.qt_accept_cre,t.sum_accept_deb, t.sum_accept_cre, t.qt_reject_deb,t.qt_reject_cre,t.sum_reject_deb,t.sum_reject_cre,t.file_path  from detail d INNER JOIN header as h ON d.file_path = h.file_path INNER JOIN trailer as t ON t.file_path=d.file_path"
-        }
-      ]
-    }
-  ],
-  "data_quality": {
-    "great_expectations": [
+  "dataQuality": {
+    "greatExpectations": [
       {
-        "expectation_type": "expect_column_to_exist",
+        "expectationType": "expect_column_to_exist",
         "kwargs": {
           "column": "name"
         }
       },
       {
-        "expectation_type": "expect_column_values_to_not_be_null",
+        "expectationType": "expect_column_values_to_not_be_null",
         "kwargs": {
           "column": "age"
         }
       },
       {
-        "expectation_type": "expect_column_values_to_be_in_set",
+        "expectationType": "expect_column_values_to_be_in_set",
         "kwargs": {
           "column": "status",
           "value_set": [
@@ -198,16 +71,16 @@
         }
       }
     ],
-    "custom_expectations": [
+    "customExpectations": [
       {
         "name": "total_custom",
         "sql": "SELECT COUNT(*) as total from test_db.source_table where age=45 ",
-        "expected_results": [{"total": 2}]
+        "expectedResults": [{"total": 2}]
       },
       {
         "name": "total_custom2",
         "sql": "SELECT COUNT(*) as total, name, status from test_db.source_table group by name, status",
-        "expected_results": [{"total": 1, "name": "Alice", "status": "single"}, {"total": 1, "name": "Alice", "status": "married"}]
+        "expectedResults": [{"total": 1, "name": "Alice", "status": "single"}, {"total": 1, "name": "Alice", "status": "married"}]
       }
     ]
   }

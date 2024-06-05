@@ -12,17 +12,20 @@ from pyspark.sql.utils import AnalysisException
 from sentinel.config.logging_config import logger
 from sentinel.models import DataQualityConfig
 
-TEMPDIR = path.join(os.getcwd(), 'tmp', f'spark_temp_dir_{uuid.uuid4()}')
-METASTORE_DB = path.join(os.getcwd(), 'metastore_db')
-SPARK_WAREHOUSE = path.join(os.getcwd(), 'spark-warehouse')
-DERBY_LOG = path.join(os.getcwd(), 'derby.log')
-
+BASE_TEMP_DIR = path.join(os.getcwd(), 'temp_test_dirs')
+TEMPDIR = path.join(BASE_TEMP_DIR, f'spark_temp_dir_{uuid.uuid4()}')
+METASTORE_DB = path.join(BASE_TEMP_DIR, 'metastore_db')
+SPARK_WAREHOUSE = path.join(BASE_TEMP_DIR, 'spark-warehouse')
+DERBY_LOG = path.join(BASE_TEMP_DIR, 'derby.log')
+CHECKPOINT = path.join(BASE_TEMP_DIR, 'checkpoint')
+TMP = path.join(BASE_TEMP_DIR, 'tmp')
 
 config_spark = {
     'spark.sql.extensions': 'io.delta.sql.DeltaSparkSessionExtension',
     'spark.sql.catalog.spark_catalog': 'org.apache.spark.sql.delta.catalog.DeltaCatalog',
     'spark.databricks.delta.retentionDurationCheck.enabled': 'false',
     'spark.local.dir': TEMPDIR,
+    'spark.sql.warehouse.dir': SPARK_WAREHOUSE,
     'spark.sql.session.timeZone': 'UTC',
     'spark.driver.memory': '2g',
     'spark.sql.shuffle.partitions': 1,
@@ -43,14 +46,12 @@ def quiet_py4j(spark):
 
 @pytest.fixture(scope='session')
 def spark():
-    if os.path.exists(TEMPDIR):
-        try:
-            shutil.rmtree(TEMPDIR, ignore_errors=True)
-        except Exception as e:
-            logger.error(
-                f'Error removing existing temporary directory at start: {e}'
-            )
+    remove_temp_folders()
     os.makedirs(TEMPDIR, exist_ok=True)
+    os.makedirs(SPARK_WAREHOUSE, exist_ok=True)
+    os.makedirs(CHECKPOINT, exist_ok=True)
+    os.makedirs(TMP, exist_ok=True)
+
     os.environ['SPARK_LOCAL_DIRS'] = TEMPDIR
     logger.info(f'Temporary directory created: {TEMPDIR}')
 
@@ -72,8 +73,6 @@ def spark():
 
     spark.stop()
 
-    remove_temp_folders()
-
 
 @pytest.fixture
 def setup_data(spark):
@@ -93,7 +92,7 @@ def setup_data(spark):
     )
 
     result_table_path = os.path.join(
-        'spark-warehouse', 'test_db.db', 'result_table'
+        SPARK_WAREHOUSE, 'test_db.db', 'result_table'
     )
     if os.path.exists(result_table_path):
         shutil.rmtree(result_table_path)
@@ -153,7 +152,14 @@ def file_path():
 
 
 def remove_temp_folders():
-    folders_to_remove = [TEMPDIR, SPARK_WAREHOUSE, DERBY_LOG, 'tmp']
+    folders_to_remove = [
+        TEMPDIR,
+        SPARK_WAREHOUSE,
+        DERBY_LOG,
+        METASTORE_DB,
+        CHECKPOINT,
+        TMP,
+    ]
 
     for folder in folders_to_remove:
         if os.path.exists(folder):

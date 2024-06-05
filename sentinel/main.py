@@ -12,7 +12,7 @@ app = Typer()
 
 @app.command()
 def main(
-    jsonpath: str = Option(..., help='Path to the configuration JSON file'),
+    json_path: str = Option(..., help='Path to the configuration JSON file'),
     source_table_name: str = Option(
         ..., help='The name of the table that will have the validated data'
     ),
@@ -20,15 +20,45 @@ def main(
         ...,
         help='The name of the table where the validation results will be saved.',
     ),
+    process_type: str = Option(
+        'batch', help='Type of the process, typically "batch" or "stream"'
+    ),
+    source_config_name: str = Option(
+        'default_config', help='The name of the source configuration to use'
+    ),
+    checkpoint: str = Option(
+        ..., help='Path to the checkpoint directory for Spark'
+    ),
 ):
     try:
+        logger.info(
+            f'Adding params to table: json_path={json_path}, source_table_name={source_table_name}, '
+            f'target_table_name={target_table_name}, process_type={process_type}, '
+            f'source_config_name={source_config_name}, checkpoint={checkpoint}'
+        )
+
+        if process_type not in ['batch', 'streaming']:
+            raise ValidationError(
+                "Invalid process type! Expected 'batch' or 'streaming'."
+            )
+
         add_params_to_table(
             main,
-            jsonpath=jsonpath,
+            json_path=json_path,
             table_name=source_table_name,
             target_table_name=target_table_name,
+            process_type=process_type,
+            source_config_name=source_config_name,
+            checkpoint=checkpoint,
         )
-        evaluate(jsonpath, source_table_name, target_table_name)
+        evaluate(
+            json_path,
+            source_table_name,
+            target_table_name,
+            process_type,
+            source_config_name,
+            checkpoint,
+        )
         sys.exit(0)
     except ValidationError as e:
         logger.error(e)

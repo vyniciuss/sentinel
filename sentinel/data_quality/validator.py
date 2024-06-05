@@ -20,54 +20,116 @@ from pyspark.sql.types import (
 
 from sentinel.config.logging_config import logger
 from sentinel.exception.ValidationError import ValidationError
-from sentinel.models import CustomExpectation, DataQualityConfig, Expectations
+from sentinel.models import Config, CustomExpectation, Expectations
 from sentinel.utils.utils import read_config_file
 
 
 def evaluate(
-    jsonpath: str,
+    json_path: str,
     source_table_name: str,
     target_table: str,
+    process_type: str,
+    source_config_name: str,
+    checkpoint: Optional[str],
     spark: Optional[SparkSession] = None,
 ):
-    """Executes data validation according to the provided configuration.
+    """
+    Executes data validation according to the provided configuration.
 
     Args:
-        :param target_table: Name of the table where validation results will be saved.
-        :param source_table_name: Name of the source table to be validated.
-        :param jsonpath: Path to the configuration JSON file
-        :param spark: .
+        json_path (str): Path to the configuration JSON file.
+        source_table_name (str): Name of the source table to be validated.
+        target_table (str): Name of the table where validation results will be saved.
+        process_type (str): Type of the process, typically "batch" or "streaming".
+        source_config_name (str): The name of the source configuration to use.
+        checkpoint (Optional[str]): Path to the checkpoint directory for Spark.
+        spark (Optional[SparkSession]): An optional Spark session. If not provided, a new Spark session will be created.
+
+    Raises:
+        ValidationError: If the validation process encounters any errors.
+
     """
     if spark is None:
         spark = SparkSession.builder.getOrCreate()
 
-    config = read_config_file(jsonpath, spark)
-    validate_data(spark, config.data_quality, source_table_name, target_table)
+    config = read_config_file(json_path, spark)
+
+    if 'batch' in process_type:
+        logger.info(f'Batch reader created {source_table_name}')
+        df = spark.table(source_table_name)
+        validate_data(spark, config, source_table_name, target_table, df)
+    else:
+        logger.info(f'Streaming reader created {source_table_name}')
+        source_config = config.find_source_config(source_config_name)
+        df = (
+            spark.readStream.format('delta')
+            .options(**source_config.read_options)
+            .table(source_table_name)
+        )
+        (
+            df.writeStream.foreachBatch(
+                create_process_batch(
+                    spark, config, source_table_name, target_table
+                )
+            )
+            .option('checkpointLocation', checkpoint)
+            .start()
+        )
+
+
+def create_process_batch(
+    spark: SparkSession,
+    config: Config,
+    source_table_name: str,
+    target_table: str,
+):
+    def process_batch(batch_df, batch_id):
+        logger.info(f'Processing batch {batch_id}')
+        spark.sparkContext.setJobDescription(f'Processing batch {batch_id}')
+        validate_data(
+            spark,
+            config,
+            source_table_name,
+            target_table,
+            batch_df,
+        )
+
+    return process_batch
 
 
 def validate_data(
     spark: SparkSession,
-    config: DataQualityConfig,
+    config: Config,
     source_table_name: str,
     target_table: str,
-):
-    """Performs data validation using both Great Expectations and custom validations.
+    dataframe: DataFrame,
+) -> None:
+    """
+    Performs data validation using both Great Expectations and custom validations.
 
     Args:
-        :param spark: Spark session.
-        :param config: Data quality configuration.
-        :param source_table_name: Name of the source table to be validated.
-        :param target_table: Name of the table where validation results will be saved.
+        spark (SparkSession): The Spark session.
+        config (Config): Configuration object containing data quality settings.
+        source_table_name (str): Name of the source table to be validated.
+        target_table (str): Name of the table where validation results will be saved.
+        dataframe (DataFrame): The Spark DataFrame to be validated.
+
+    Raises:
+        ValidationError: If any validation fails.
+
     """
     logger.info('Starting validation')
-    expectation_suite = create_expectation_suite(config.great_expectations)
-    spark_df = spark.table(source_table_name)
+
+    expectation_suite = create_expectation_suite(
+        config.data_quality.great_expectations
+    )
+
     result_df, success = validate_great_expectations(
-        spark, spark_df, expectation_suite, source_table_name
+        spark, dataframe, expectation_suite, source_table_name
     )
 
     custom_results_df, custom_success = validate_custom_expectations(
-        spark, config.custom_expectations, source_table_name
+        spark, config.data_quality.custom_expectations, source_table_name
     )
 
     final_result_df = result_df
@@ -79,7 +141,7 @@ def validate_data(
             f'An error occurred during execution! Please consult '
             f'table {target_table} for more information.'
         )
-
+    logger.info(f'Final Dataframe {final_result_df.count()}')
     final_result_df.write.format('delta').mode('append').saveAsTable(
         target_table
     )
@@ -87,7 +149,21 @@ def validate_data(
 
 def validate_great_expectations(
     spark, spark_df, expectation_suite, table_name
-):
+) -> None:
+    """
+    Validates a Spark DataFrame using Great Expectations and logs the results.
+
+    Args:
+        spark (SparkSession): The Spark session.
+        spark_df (DataFrame): The Spark DataFrame to be validated.
+        expectation_suite (Any): The expectation suite to be used for validation.
+        table_name (str): The name of the table being validated.
+
+    Returns:
+        Tuple[DataFrame, bool]: A tuple containing the DataFrame of validation results and a boolean indicating overall success.
+
+    """
+    logger.info('Starting validation with great expectations')
     ge_df = ge.dataset.SparkDFDataset(spark_df)
     start_time = time.time()
     result = ge_df.validate(expectation_suite=expectation_suite)

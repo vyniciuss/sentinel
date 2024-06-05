@@ -70,7 +70,7 @@ Create a JSON configuration file (e.g., `process.json`) to define your data qual
     {
       "name": "total_custom2",
       "sql": "SELECT COUNT(*) as total, name, street from test_db.source_table where age=30",
-      "result_columns": [{"total": 1, "name": "Joan", "street": "address..."}, {"total": 2, "name": "Joan", "street": "address..."}]
+      "result_columns": [{"total": 1, "name": "Joan", "street": "address"}, {"total": 2, "name": "Joan", "street": "address"}]
     }
   ]
 }

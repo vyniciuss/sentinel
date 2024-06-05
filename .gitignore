@@ -172,3 +172,7 @@ cython_debug/
 /tests/metastore_db/db.lck
 /metastore_db/log/logmirror.ctrl
 /metastore_db/README_DO_NOT_TOUCH_FILES.txt
+/tests/checkpoint/*
+/checkpoint/*
+/temp_test_dirs/*
+/tests/temp_test_dirs/*

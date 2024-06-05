@@ -74,13 +74,15 @@
     "customExpectations": [
       {
         "name": "total_custom",
-        "sql": "SELECT COUNT(*) as total from test_db.source_table where age=45 ",
-        "expectedResults": [{"total": 2}]
+        "sql": "SELECT CASE WHEN COUNT(*) = 2 THEN 1 ELSE 0 END as validation_result from test_db.source_table where age=45"
       },
       {
         "name": "total_custom2",
-        "sql": "SELECT COUNT(*) as total, name, status from test_db.source_table group by name, status",
-        "expectedResults": [{"total": 1, "name": "Alice", "status": "single"}, {"total": 1, "name": "Alice", "status": "married"}]
+        "sql": "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END as validation_result from test_db.source_table where name = 'Alice' and status = 'single'"
+      },
+       {
+        "name": "total_custom3",
+        "sql": "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END as validation_result from test_db.source_table where name = 'Alice' and status = 'married'"
       }
     ]
   }

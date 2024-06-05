@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import List, Optional, Tuple
 
 import great_expectations as ge
+import pyspark.sql.functions as F
 from great_expectations.core import ExpectationSuite
 from great_expectations.core.expectation_configuration import (
     ExpectationConfiguration,
@@ -61,13 +62,11 @@ def evaluate(
     else:
         logger.info(f'Streaming reader created {source_table_name}')
         source_config = config.find_source_config(source_config_name)
-        df = (
+        (
             spark.readStream.format('delta')
             .options(**source_config.read_options)
             .table(source_table_name)
-        )
-        (
-            df.writeStream.foreachBatch(
+            .writeStream.foreachBatch(
                 create_process_batch(
                     spark, config, source_table_name, target_table
                 )
@@ -103,7 +102,7 @@ def validate_data(
     source_table_name: str,
     target_table: str,
     dataframe: DataFrame,
-) -> None:
+) -> bool:
     """
     Performs data validation using both Great Expectations and custom validations.
 
@@ -124,7 +123,7 @@ def validate_data(
         config.data_quality.great_expectations
     )
 
-    result_df, success = validate_great_expectations(
+    result_df, ge_success = validate_great_expectations(
         spark, dataframe, expectation_suite, source_table_name
     )
 
@@ -136,19 +135,23 @@ def validate_data(
     if custom_results_df is not None:
         final_result_df = result_df.union(custom_results_df)
 
-    if not success or not custom_success:
-        raise ValidationError(
-            f'An error occurred during execution! Please consult '
-            f'table {target_table} for more information.'
-        )
     logger.info(f'Final Dataframe {final_result_df.count()}')
     final_result_df.write.format('delta').mode('append').saveAsTable(
         target_table
     )
 
+    if not ge_success or not custom_success:
+        raise ValidationError(
+            f'An error occurred during execution! Please consult '
+            f'table {target_table} for more information.'
+        )
+
 
 def validate_great_expectations(
-    spark, spark_df, expectation_suite, table_name
+    spark: SparkSession,
+    spark_df: DataFrame,
+    expectation_suite: ExpectationSuite,
+    table_name: str,
 ) -> None:
     """
     Validates a Spark DataFrame using Great Expectations and logs the results.
@@ -176,7 +179,7 @@ def validate_great_expectations(
             'expectation_type': res['expectation_config']['expectation_type'],
             'kwargs': json.dumps(res['expectation_config']['kwargs']),
             'success': res['success'],
-            'error_message': res['result'].get('unexpected_count', None),
+            'error_message': res['result'].get('unexpected_list', None),
             'observed_value': str(res['result'].get('observed_value', None)),
             'severity': 'critical' if not res['success'] else 'info',
             'table_name': table_name,
@@ -184,7 +187,7 @@ def validate_great_expectations(
             'validation_id': validation_id,
             'validation_time': validation_time,
             'batch_id': f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            'datasource_name': 'mock_datasource',
+            'datasource_name': table_name,
             'dataset_name': 'mock_dataset',
             'expectation_suite_name': expectation_suite.expectation_suite_name,
         }
@@ -216,61 +219,33 @@ def validate_custom_expectations(
     records = []
     custom_success = True
 
-    for custom in custom_expectations:
-        sql_query = custom.sql
-        expected_columns_list = custom.expected_results
+    for expectation in custom_expectations:
+        validation_id = (
+            f"validation_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
+        logger.info(f'Executing query for expectation: {expectation.name}')
+        sql_query = expectation.sql
+        logger.info(sql_query)
+        start_time = time.time()
         result_df = spark.sql(sql_query)
-        result = result_df.collect()
-
-        expected_column_names = set()
-        for expected_columns in expected_columns_list:
-            expected_column_names.update(expected_columns.keys())
-        expected_column_names = list(expected_column_names)
-
-        actual_columns = result_df.columns
-        missing_columns = [
-            col for col in expected_column_names if col not in actual_columns
-        ]
-        column_validation_success = not missing_columns
-
-        value_validation_success = True
-        if column_validation_success:
-            for expected in expected_columns_list:
-                match_found = any(
-                    all(
-                        row[col] == val
-                        for col, val in expected.items()
-                        if col in actual_columns
-                    )
-                    for row in result
-                )
-                if not match_found:
-                    value_validation_success = False
-                    break
-
-        success = column_validation_success and value_validation_success
+        success = result_df.filter(F.col('validation_result') == 1).count() > 0
+        validation_time = time.time() - start_time
 
         record = {
-            'expectation_type': custom.name,
-            'kwargs': json.dumps(
-                {'sql': sql_query, 'expected_columns': expected_columns_list}
-            ),
+            'expectation_type': expectation.name,
+            'kwargs': json.dumps({'sql': sql_query}),
             'success': success,
-            'error_message': None
-            if success
-            else f'Expected result: {expected_columns_list}, got: {result}. Expected columns: {expected_column_names}, got: {actual_columns}. Missing columns: {missing_columns}',
-            'observed_value': str(
-                json.dumps([row.asDict() for row in result])
-            ),
+            'error_message': None if success else 'Validation failed',
+            'observed_value': None,
             'severity': 'critical' if not success else 'info',
             'table_name': source_table_name,
             'execution_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'validation_id': f"validation_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            'validation_time': None,
+            'validation_id': validation_id,
+            'validation_time': validation_time,
             'batch_id': f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             'datasource_name': source_table_name,
-            'dataset_name': None,
-            'expectation_suite_name': None,
+            'dataset_name': source_table_name,
+            'expectation_suite_name': expectation.name,
         }
         records.append(record)
 

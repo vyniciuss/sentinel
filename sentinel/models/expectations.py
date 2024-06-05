@@ -15,9 +15,6 @@ class Expectations(BaseModel):
 class CustomExpectation(BaseModel):
     name: Optional[str] = None
     sql: Optional[str] = None
-    expected_results: Optional[List[Dict[str, Any]]] = Field(
-        None, alias='expectedResults'
-    )
 
     class Config:
         arbitrary_types_allowed = True

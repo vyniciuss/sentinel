@@ -61,18 +61,20 @@ Create a JSON configuration file (e.g., `process.json`) to define your data qual
       }
     }
   ],
-  "custom_expectations": [
-    {
-      "name": "total_custom",
-      "sql": "SELECT COUNT(*) as total from test_db.source_table where age=45",
-      "result_columns": [{"total": 1}, {"total": 2}]
-    },
-    {
-      "name": "total_custom2",
-      "sql": "SELECT COUNT(*) as total, name, street from test_db.source_table where age=30",
-      "result_columns": [{"total": 1, "name": "Joan", "street": "address"}, {"total": 2, "name": "Joan", "street": "address"}]
-    }
-  ]
+    "customExpectations": [
+      {
+        "name": "total_custom",
+        "sql": "SELECT CASE WHEN COUNT(*) = 2 THEN 1 ELSE 0 END as validation_result from test_db.source_table where age=45"
+      },
+      {
+        "name": "total_custom2",
+        "sql": "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END as validation_result from test_db.source_table where name = 'Alice' and status = 'single'"
+      },
+       {
+        "name": "total_custom3",
+        "sql": "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END as validation_result from test_db.source_table where name = 'Alice' and status = 'married'"
+      }
+    ]
 }
 ```
 
@@ -106,13 +108,12 @@ Here is an example of how to use Sentinel in a typical data validation scenario.
          }
        }
      ],
-     "custom_expectations": [
-       {
-         "name": "total_custom",
-         "sql": "SELECT COUNT(*) as total from test_db.source_table where age=45",
-         "result_columns": [{"total": 1}, {"total": 2}]
-       }
-     ]
+    "customExpectations": [
+      {
+        "name": "total_custom",
+        "sql": "SELECT CASE WHEN COUNT(*) = 2 THEN 1 ELSE 0 END as validation_result from test_db.source_table where age=45"
+      }
+    ]
    }
    ```
 

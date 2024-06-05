@@ -8,15 +8,15 @@ Este documento descreve a arquitetura proposta para a implementação de um sist
 
 ### Must Have:
 - Monitoramento contínuo de anomalias e mudanças no comportamento dos dados usando modelos de machine learning e estatísticas.
-- Integração com Great Expectations para validações complexas e detalhadas dos dados.
+- ~~Integração com Great Expectations para validações complexas e detalhadas dos dados.~~
 - Gestão robusta de metadados que inclui histórico, fonte e descrição dos dados.
 - Verificações regulares de consistência e conformidade com os padrões internos.
 - Dashboards de monitoramento para exibição de indicadores de qualidade de dados em tempo real.
 - Possibilidade de desabilitar jobs críticos com a percepção da queda de qualidade dos dados.
 - Categorização dos níveis de criticidade das validações.
-- Tabela com histórico das validações.
+- ~~Tabela com histórico das validações~~.
 - Relatórios com análise de tendências da qualidade.
-- Validação dos dados via structured streaming e batch.
+- ~~Validação dos dados via structured streaming e batch~~.
 - Criação de relatórios com resumos das validações.
 - Incluir templates de notificações com Jinja.
 - Incluir notificações via e-mail, Teams e REST.

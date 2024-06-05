@@ -7,6 +7,9 @@ class Expectations(BaseModel):
 
     expectation_type: Optional[str] = Field(None, alias='expectationType')
     kwargs: Optional[Dict[str, Any]] = None
+    level:  Optional[str] = None
+    description:  Optional[str] = None
+    type:  Optional[str] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -15,6 +18,9 @@ class Expectations(BaseModel):
 class CustomExpectation(BaseModel):
     name: Optional[str] = None
     sql: Optional[str] = None
+    level: Optional[str] = None
+    description: Optional[str] = None
+    type: Optional[str] = None
 
     class Config:
         arbitrary_types_allowed = True

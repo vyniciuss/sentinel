@@ -21,7 +21,12 @@ from pyspark.sql.types import (
 
 from sentinel.config.logging_config import logger
 from sentinel.exception.ValidationError import ValidationError
-from sentinel.models import Config, CustomExpectation, Expectations
+from sentinel.models import (
+    Config,
+    CustomExpectation,
+    Expectations,
+    MetricsConfig,
+)
 from sentinel.utils.utils import read_config_file
 
 
@@ -305,3 +310,52 @@ def create_expectation_suite(
         )
         suite.add_expectation(expectation_config)
     return suite
+
+
+def generate_metrics_query(
+    source_table_name: str, metrics_config: MetricsConfig
+) -> str:
+    select_statements = []
+    for metric, conditions in metrics_config:
+        if conditions is not None:
+            for condition in conditions:
+                column_name = condition.column_name
+                condition_query = condition.condition
+                select_statements.append(
+                    f'SUM(CASE WHEN {condition_query} THEN 1 ELSE 0 END) / COUNT(*) AS {column_name}'
+                )
+
+    metrics_query = (
+        f"SELECT {', '.join(select_statements)} FROM {source_table_name}"
+    )
+    return metrics_query
+
+
+def save_metrics(
+    metrics_df: DataFrame,
+    table_name: str,
+    execution_date: str,
+    validation_id: str,
+    target_table_name: str,
+):
+    metrics_df = metrics_df.withColumn(
+        'metrics', F.to_json(F.struct(*metrics_df.columns))
+    )
+    metrics_df = metrics_df.withColumn('table_name', F.lit(table_name))
+    metrics_df = metrics_df.withColumn('execution_date', F.lit(execution_date))
+    metrics_df = metrics_df.withColumn('validation_id', F.lit(validation_id))
+
+    final_df = metrics_df.select(
+        'table_name', 'execution_date', 'validation_id', 'metrics'
+    )
+    final_df.write.format('delta').mode('append').saveAsTable(
+        target_table_name
+    )
+
+
+def calculate_metrics_in_sql(
+    spark: SparkSession, source_table_name: str, metrics_config: MetricsConfig
+) -> DataFrame:
+    metrics_query = generate_metrics_query(source_table_name, metrics_config)
+    metrics_df = spark.sql(metrics_query)
+    return metrics_df

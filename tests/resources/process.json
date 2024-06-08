@@ -80,10 +80,69 @@
         "name": "total_custom2",
         "sql": "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END as validation_result from test_db.source_table where name = 'Alice' and status = 'single'"
       },
-       {
+      {
         "name": "total_custom3",
         "sql": "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END as validation_result from test_db.source_table where name = 'Alice' and status = 'married'"
       }
-    ]
+    ],
+    "notifications": {
+      "enabled": true,
+      "channels": {
+        "email": [
+          "data-team@example.com"
+        ],
+        "slack": [
+          "#data-alerts"
+        ]
+      }
+    },
+    "metrics": {
+      "accuracy": [
+        {
+          "column_name": "accuracy_email",
+          "condition": "email LIKE '%@%.%' AND age BETWEEN 0 AND 120"
+        },
+        {
+          "column_name": "accuracy_age",
+          "condition": "age BETWEEN 0 AND 120"
+        }
+      ],
+      "completeness": [
+        {
+          "column_name": "completeness_name",
+          "condition": "name IS NOT NULL"
+        },
+        {
+          "column_name": "completeness_email",
+          "condition": "email IS NOT NULL"
+        }
+      ],
+      "consistency": [
+        {
+          "column_name": "consistency_signup_date",
+          "condition": "signup_date <= CURRENT_DATE"
+        },
+        {
+          "column_name": "consistency_email",
+          "condition": "email IS NOT NULL"
+        }
+      ],
+      "timeliness": [
+        {
+          "column_name": "timeliness_signup_date",
+          "condition": "DATEDIFF(CURRENT_DATE, signup_date) <= 30"
+        }
+      ],
+      "validity": [
+        {
+          "column_name": "validity_age",
+          "condition": "age >= 0 AND age <= 120"
+        },
+        {
+          "column_name": "validity_email",
+          "condition": "email LIKE '%@%.%'"
+        }
+      ]
+    }
   }
 }

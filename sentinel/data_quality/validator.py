@@ -1,42 +1,27 @@
-import json
-import time
-from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import Optional
 
-import great_expectations as ge
-import pyspark.sql.functions as F
-from great_expectations.core import ExpectationSuite
-from great_expectations.core.expectation_configuration import (
-    ExpectationConfiguration,
-)
-from great_expectations.dataset.sparkdf_dataset import SparkDFDataset
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.types import (
-    BooleanType,
-    FloatType,
-    StringType,
-    StructField,
-    StructType,
-)
 
 from sentinel.config.logging_config import logger
-from sentinel.exception.ValidationError import ValidationError
-from sentinel.models import (
-    Config,
-    CustomExpectation,
-    Expectations,
-    MetricsConfig,
+from sentinel.data_quality.expectations_validator import (
+    create_expectation_suite,
+    validate_custom_expectations,
+    validate_great_expectations,
 )
+from sentinel.data_quality.metrics_validator import generate_and_save_metrics
+from sentinel.exception.ValidationError import ValidationError
+from sentinel.models import Config
 from sentinel.utils.utils import read_config_file
 
 
-def evaluate(
+def evaluate_all(
     json_path: str,
     source_table_name: str,
     target_table: str,
     process_type: str,
     source_config_name: str,
     checkpoint: Optional[str],
+    metric_set_name: Optional[str] = None,
     spark: Optional[SparkSession] = None,
 ):
     """
@@ -63,7 +48,9 @@ def evaluate(
     if 'batch' in process_type:
         logger.info(f'Batch reader created {source_table_name}')
         df = spark.table(source_table_name)
-        validate_data(spark, config, source_table_name, target_table, df)
+        validate_data(
+            spark, config, source_table_name, target_table, df, metric_set_name
+        )
     else:
         logger.info(f'Streaming reader created {source_table_name}')
         source_config = config.find_source_config(source_config_name)
@@ -73,7 +60,11 @@ def evaluate(
             .table(source_table_name)
             .writeStream.foreachBatch(
                 create_process_batch(
-                    spark, config, source_table_name, target_table
+                    spark,
+                    config,
+                    source_table_name,
+                    target_table,
+                    metric_set_name,
                 )
             )
             .option('checkpointLocation', checkpoint)
@@ -86,6 +77,7 @@ def create_process_batch(
     config: Config,
     source_table_name: str,
     target_table: str,
+    metric_set_name: Optional[str],
 ):
     def process_batch(batch_df, batch_id):
         logger.info(f'Processing batch {batch_id}')
@@ -96,6 +88,7 @@ def create_process_batch(
             source_table_name,
             target_table,
             batch_df,
+            metric_set_name,
         )
 
     return process_batch
@@ -107,6 +100,7 @@ def validate_data(
     source_table_name: str,
     target_table: str,
     dataframe: DataFrame,
+    metric_set_name: Optional[str],
 ) -> bool:
     """
     Performs data validation using both Great Expectations and custom validations.
@@ -140,9 +134,16 @@ def validate_data(
     if custom_results_df is not None:
         final_result_df = result_df.union(custom_results_df)
 
-    logger.info(f'Final Dataframe {final_result_df.count()}')
     final_result_df.write.format('delta').mode('append').saveAsTable(
         target_table
+    )
+
+    generate_and_save_metrics(
+        config.data_quality,
+        source_table_name,
+        spark,
+        target_table,
+        metric_set_name,
     )
 
     if not ge_success or not custom_success:
@@ -150,212 +151,3 @@ def validate_data(
             f'An error occurred during execution! Please consult '
             f'table {target_table} for more information.'
         )
-
-
-def validate_great_expectations(
-    spark: SparkSession,
-    spark_df: DataFrame,
-    expectation_suite: ExpectationSuite,
-    table_name: str,
-) -> None:
-    """
-    Validates a Spark DataFrame using Great Expectations and logs the results.
-
-    Args:
-        spark (SparkSession): The Spark session.
-        spark_df (DataFrame): The Spark DataFrame to be validated.
-        expectation_suite (Any): The expectation suite to be used for validation.
-        table_name (str): The name of the table being validated.
-
-    Returns:
-        Tuple[DataFrame, bool]: A tuple containing the DataFrame of validation results and a boolean indicating overall success.
-
-    """
-    logger.info('Starting validation with great expectations')
-    ge_df = ge.dataset.SparkDFDataset(spark_df)
-    start_time = time.time()
-    result = ge_df.validate(expectation_suite=expectation_suite)
-    validation_time = time.time() - start_time
-
-    records = []
-    validation_id = f"validation_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    for res in result['results']:
-        record = {
-            'expectation_type': res['expectation_config']['expectation_type'],
-            'kwargs': json.dumps(res['expectation_config']['kwargs']),
-            'success': res['success'],
-            'error_message': res['result'].get('unexpected_list', None),
-            'observed_value': str(res['result'].get('observed_value', None)),
-            'severity': 'critical' if not res['success'] else 'info',
-            'table_name': table_name,
-            'execution_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'validation_id': validation_id,
-            'validation_time': validation_time,
-            'batch_id': f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            'datasource_name': table_name,
-            'dataset_name': 'mock_dataset',
-            'expectation_suite_name': expectation_suite.expectation_suite_name,
-        }
-        records.append(record)
-
-    schema = generate_target_schema()
-
-    result_df = spark.createDataFrame(records, schema)
-    return result_df, result['success']
-
-
-def validate_custom_expectations(
-    spark: SparkSession,
-    custom_expectations: List[CustomExpectation],
-    source_table_name: str,
-) -> Tuple[DataFrame, bool]:
-    """Validates data using custom SQL queries.
-
-    Args:
-        spark (SparkSession): Spark session.
-        custom_expectations (List[CustomExpectation]): List of custom SQL expectations.
-        source_table_name (str): Name of the source table being validated.
-
-    Returns:
-        Tuple[DataFrame, bool]: DataFrame with validation results and success status.
-    """
-    logger.info('Starting validation with custom expectations')
-
-    records = []
-    custom_success = True
-
-    for expectation in custom_expectations:
-        validation_id = (
-            f"validation_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        )
-        logger.info(f'Executing query for expectation: {expectation.name}')
-        sql_query = expectation.sql
-        logger.info(sql_query)
-        start_time = time.time()
-        result_df = spark.sql(sql_query)
-        success = result_df.filter(F.col('validation_result') == 1).count() > 0
-        validation_time = time.time() - start_time
-
-        record = {
-            'expectation_type': expectation.name,
-            'kwargs': json.dumps({'sql': sql_query}),
-            'success': success,
-            'error_message': None if success else 'Validation failed',
-            'observed_value': None,
-            'severity': 'critical' if not success else 'info',
-            'table_name': source_table_name,
-            'execution_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'validation_id': validation_id,
-            'validation_time': validation_time,
-            'batch_id': f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            'datasource_name': source_table_name,
-            'dataset_name': source_table_name,
-            'expectation_suite_name': expectation.name,
-        }
-        records.append(record)
-
-        if not success:
-            custom_success = False
-
-    schema = generate_target_schema()
-
-    result_df = spark.createDataFrame(records, schema)
-    return result_df, custom_success
-
-
-def generate_target_schema() -> StructType:
-    """Generates the schema for the validation results DataFrame.
-
-    Returns:
-        StructType: Schema for the validation results DataFrame.
-    """
-    schema = StructType(
-        [
-            StructField('expectation_type', StringType(), True),
-            StructField('kwargs', StringType(), True),
-            StructField('success', BooleanType(), True),
-            StructField('error_message', StringType(), True),
-            StructField('observed_value', StringType(), True),
-            StructField('severity', StringType(), True),
-            StructField('table_name', StringType(), True),
-            StructField('execution_date', StringType(), True),
-            StructField('validation_id', StringType(), True),
-            StructField('validation_time', FloatType(), True),
-            StructField('batch_id', StringType(), True),
-            StructField('datasource_name', StringType(), True),
-            StructField('dataset_name', StringType(), True),
-            StructField('expectation_suite_name', StringType(), True),
-        ]
-    )
-    return schema
-
-
-def create_expectation_suite(
-    expectations: List[Expectations], suite_name='default_suite'
-) -> ExpectationSuite:
-    """Creates an ExpectationSuite from a list of expectation configurations.
-
-    Args:
-        expectations (List[ExpectationConfiguration]): List of expectation configurations.
-        suite_name (str): Name of the expectation suite.
-
-    Returns:
-        ExpectationSuite: Created ExpectationSuite.
-    """
-    suite = ge.core.ExpectationSuite(expectation_suite_name=suite_name)
-    for expectation in expectations:
-        expectation_config = ExpectationConfiguration(
-            expectation_type=expectation.expectation_type,
-            kwargs=expectation.kwargs,
-        )
-        suite.add_expectation(expectation_config)
-    return suite
-
-
-def generate_metrics_query(
-    source_table_name: str, metrics_config: MetricsConfig
-) -> str:
-    select_statements = []
-    for metric, conditions in metrics_config:
-        if conditions is not None:
-            for condition in conditions:
-                column_name = condition.column_name
-                condition_query = condition.condition
-                select_statements.append(
-                    f'SUM(CASE WHEN {condition_query} THEN 1 ELSE 0 END) / COUNT(*) AS {column_name}'
-                )
-
-    metrics_query = (
-        f"SELECT {', '.join(select_statements)} FROM {source_table_name}"
-    )
-    return metrics_query
-
-
-def save_metrics(
-    metrics_df: DataFrame,
-    table_name: str,
-    execution_date: str,
-    validation_id: str,
-    target_table_name: str,
-):
-    metrics_df = metrics_df.withColumn(
-        'metrics', F.to_json(F.struct(*metrics_df.columns))
-    )
-    metrics_df = metrics_df.withColumn('table_name', F.lit(table_name))
-    metrics_df = metrics_df.withColumn('execution_date', F.lit(execution_date))
-    metrics_df = metrics_df.withColumn('validation_id', F.lit(validation_id))
-
-    final_df = metrics_df.select(
-        'table_name', 'execution_date', 'validation_id', 'metrics'
-    )
-    final_df.write.format('delta').mode('append').saveAsTable(
-        target_table_name
-    )
-
-
-def calculate_metrics_in_sql(
-    spark: SparkSession, source_table_name: str, metrics_config: MetricsConfig
-) -> DataFrame:
-    metrics_query = generate_metrics_query(source_table_name, metrics_config)
-    metrics_df = spark.sql(metrics_query)
-    return metrics_df

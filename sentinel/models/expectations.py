@@ -2,6 +2,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from sentinel.models.metrics import MetricSet
+
 
 class Expectations(BaseModel):
 
@@ -33,3 +35,4 @@ class DataQualityConfig(BaseModel):
     custom_expectations: Optional[List[CustomExpectation]] = Field(
         None, alias='customExpectations'
     )
+    metrics_config: List[MetricSet] = Field(default_factory=list)

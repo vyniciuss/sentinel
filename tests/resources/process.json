@@ -96,53 +96,37 @@
         ]
       }
     },
-    "metrics": {
-      "accuracy": [
-        {
-          "column_name": "accuracy_email",
-          "condition": "email LIKE '%@%.%' AND age BETWEEN 0 AND 120"
+    "metrics_config": [
+      {
+        "id": "set1",
+        "name": "basic_metrics",
+        "group_by": null,
+        "metrics": {
+          "accuracy": [
+            {
+              "column_name": "accuracy_name",
+              "condition": "name LIKE '%@%.%'"
+            },
+            {
+              "column_name": "accuracy_age",
+              "condition": "age BETWEEN 0 AND 120"
+            }
+          ],
+          "completeness": [
+            {
+              "column_name": "completeness_name",
+              "condition": "name IS NOT NULL"
+            }
+          ]
         },
-        {
-          "column_name": "accuracy_age",
-          "condition": "age BETWEEN 0 AND 120"
-        }
-      ],
-      "completeness": [
-        {
-          "column_name": "completeness_name",
-          "condition": "name IS NOT NULL"
-        },
-        {
-          "column_name": "completeness_email",
-          "condition": "email IS NOT NULL"
-        }
-      ],
-      "consistency": [
-        {
-          "column_name": "consistency_signup_date",
-          "condition": "signup_date <= CURRENT_DATE"
-        },
-        {
-          "column_name": "consistency_email",
-          "condition": "email IS NOT NULL"
-        }
-      ],
-      "timeliness": [
-        {
-          "column_name": "timeliness_signup_date",
-          "condition": "DATEDIFF(CURRENT_DATE, signup_date) <= 30"
-        }
-      ],
-      "validity": [
-        {
-          "column_name": "validity_age",
-          "condition": "age >= 0 AND age <= 120"
-        },
-        {
-          "column_name": "validity_email",
-          "condition": "email LIKE '%@%.%'"
-        }
-      ]
-    }
+        "validation_rules": [
+          {
+            "name": "age_range_check",
+            "condition": "accuracy_age > 0.95",
+            "error_message": "Age accuracy is below 95%"
+          }
+        ]
+      }
+    ]
   }
 }

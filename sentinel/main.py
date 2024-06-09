@@ -1,9 +1,10 @@
 import sys
+from typing import Optional
 
 from typer import Option, Typer
 
 from sentinel.config.logging_config import logger
-from sentinel.data_quality.validator import evaluate
+from sentinel.data_quality.validator import evaluate_all
 from sentinel.exception.ValidationError import ValidationError
 from sentinel.utils.utils import add_params_to_table
 
@@ -29,6 +30,7 @@ def main(
     checkpoint: str = Option(
         ..., help='Path to the checkpoint directory for Spark'
     ),
+    metric_set_name: Optional[str] = Option(None, help='Metrics set name')
 ):
     try:
         logger.info(
@@ -50,14 +52,16 @@ def main(
             process_type=process_type,
             source_config_name=source_config_name,
             checkpoint=checkpoint,
+            metric_set_name=metric_set_name,
         )
-        evaluate(
+        evaluate_all(
             json_path,
             source_table_name,
             target_table_name,
             process_type,
             source_config_name,
-            checkpoint,
+            checkpoint=checkpoint,
+            metric_set_name=metric_set_name,
         )
         sys.exit(0)
     except ValidationError as e:

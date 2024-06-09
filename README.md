@@ -8,6 +8,7 @@ Sentinel is a data quality validation project designed to ensure the integrity a
 
 - **Great Expectations Integration**: Leverage the robust validation framework of Great Expectations to perform comprehensive data quality checks.
 - **Custom Expectations**: Define and execute custom SQL-based validations tailored to your specific data quality requirements.
+- **Metrics Calculation and Validation**: Compute and validate data metrics as part of the validation process.
 - **Comprehensive Reporting**: Detailed logging and reporting of validation results, including success and failure details.
 
 ## Getting Started
@@ -61,22 +62,72 @@ Create a JSON configuration file (e.g., `process.json`) to define your data qual
       }
     }
   ],
-    "customExpectations": [
-      {
-        "name": "total_custom",
-        "sql": "SELECT CASE WHEN COUNT(*) = 2 THEN 1 ELSE 0 END as validation_result from test_db.source_table where age=45"
+  "customExpectations": [
+    {
+      "name": "total_custom",
+      "sql": "SELECT CASE WHEN COUNT(*) = 2 THEN 1 ELSE 0 END as validation_result from test_db.source_table where age=45"
+    },
+    {
+      "name": "total_custom2",
+      "sql": "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END as validation_result from test_db.source_table where name = 'Alice' and status = 'single'"
+    },
+    {
+      "name": "total_custom3",
+      "sql": "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END as validation_result from test_db.source_table where name = 'Alice' and status = 'married'"
+    }
+  ],
+  "metrics_config": [
+    {
+      "id": "1",
+      "name": "test_metrics",
+      "group_by": "status",
+      "metrics": {
+        "accuracy_age": [
+          {
+            "column_name": "accuracy_age",
+            "condition": "age BETWEEN 0 AND 120"
+          }
+        ],
+        "completeness_name": [
+          {
+            "column_name": "completeness_name",
+            "condition": "name IS NOT NULL"
+          }
+        ]
       },
-      {
-        "name": "total_custom2",
-        "sql": "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END as validation_result from test_db.source_table where name = 'Alice' and status = 'single'"
-      },
-       {
-        "name": "total_custom3",
-        "sql": "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END as validation_result from test_db.source_table where name = 'Alice' and status = 'married'"
-      }
-    ]
+      "validation_rules": [
+        {
+          "name": "age_range_check",
+          "condition": "accuracy_age > 0.95",
+          "error_message": "Age accuracy is below 95%"
+        }
+      ]
+    }
+  ]
 }
 ```
+
+### Explanation of Metrics Configuration
+
+The `metrics_config` section allows you to define sets of metrics and their associated validation rules. Each metric set includes:
+
+- `id`: A unique identifier for the metric set.
+- `name`: The name of the metric set.
+- `group_by` (optional): A column name to group the metrics by.
+- `metrics`: A dictionary where keys are metric names and values are lists of conditions used to compute the metrics. Each condition includes:
+  - `column_name`: The name of the column for the metric.
+  - `condition`: The SQL condition used to calculate the metric.
+- `validation_rules`: A list of validation rules applied to the calculated metrics. Each validation rule includes:
+  - `name`: The name of the validation rule.
+  - `condition`: The condition that must be met for the metric to pass validation.
+  - `error_message`: The error message to be logged if the validation fails.
+
+#### Example
+
+In the example above, `test_metrics` is a metric set that:
+- Calculates the accuracy of the `age` column (`accuracy_age`), ensuring values are between 0 and 120.
+- Calculates the completeness of the `name` column (`completeness_name`), ensuring no values are null.
+- Applies a validation rule (`age_range_check`) that ensures the `accuracy_age` is greater than 0.95. If this condition is not met, an error message "Age accuracy is below 95%" is logged.
 
 ### Usage
 
@@ -108,12 +159,40 @@ Here is an example of how to use Sentinel in a typical data validation scenario.
          }
        }
      ],
-    "customExpectations": [
-      {
-        "name": "total_custom",
-        "sql": "SELECT CASE WHEN COUNT(*) = 2 THEN 1 ELSE 0 END as validation_result from test_db.source_table where age=45"
-      }
-    ]
+     "customExpectations": [
+       {
+         "name": "total_custom",
+         "sql": "SELECT CASE WHEN COUNT(*) = 2 THEN 1 ELSE 0 END as validation_result from test_db.source_table where age=45"
+       }
+     ],
+     "metrics_config": [
+       {
+         "id": "1",
+         "name": "test_metrics",
+         "group_by": "status",
+         "metrics": {
+           "accuracy_age": [
+             {
+               "column_name": "accuracy_age",
+               "condition": "age BETWEEN 0 AND 120"
+             }
+           ],
+           "completeness_name": [
+             {
+               "column_name": "completeness_name",
+               "condition": "name IS NOT NULL"
+             }
+           ]
+         },
+         "validation_rules": [
+           {
+             "name": "age_range_check",
+             "condition": "accuracy_age > 0.95",
+             "error_message": "Age accuracy is below 95%"
+           }
+         ]
+       }
+     ]
    }
    ```
 
@@ -146,40 +225,46 @@ The validation results are saved in a Delta table specified by the `--target-tab
 - `dataset_name` (StringType): The name of the dataset.
 - `expectation_suite_name` (StringType): The name of the expectation suite.
 
-### Example of Validation Results
+### Metrics Reporting
 
-#### Custom Expectation Result
+The metrics results are also saved in a Delta table specified by the `--target-table-name` parameter with a `_metrics` suffix. The schema of this table is as follows:
+
+- `table_name` (StringType): The name of the table that was validated.
+- `execution_date` (StringType): The date and time of the metrics calculation.
+- `validation_id` (StringType): A unique ID for the validation.
+- `metric_set_name` (StringType): The name of the metric set.
+- `metric_set_id` (StringType): The ID of the metric set.
+- `metrics` (StringType): A JSON string containing the calculated metrics.
+
+To extract and display the metrics in a more readable format, you can use the `extract_and_display_metrics` function:
+
+```python
+def extract_and_display_metrics(spark: SparkSession, target_table_name: str) -> DataFrame:
+    metrics_df = spark.table(target_table_name)
+    metrics_df = metrics_df.withColumn("metrics_exploded", F.explode(F.map_entries(F.from_json(F.col("metrics"), "map<string, string>"))))
+    exploded_df = metrics_df.select(
+        "table_name",
+        "execution_date",
+        "validation_id",
+        "metric_set_name",
+        F.col("metrics_exploded.key").alias("metric_name"),
+        F.col
+
+("metrics_exploded.value").alias("metric_value")
+    )
+    exploded_df.show(10, truncate=False)
+    return exploded_df
+```
+
+### Example of Metrics Results
 
 ```plaintext
-| expectation_type | kwargs                                 | success | error_message | observed_value | severity | table_name         | execution_date      | validation_id      | validation_time | batch_id         | datasource_name  | dataset_name | expectation_suite_name |
-|------------------|----------------------------------------|---------|---------------|----------------|----------|---------------------|---------------------|--------------------|-----------------|------------------|------------------|--------------|------------------------|
-| total_custom     | {"sql": "SELECT COUNT(*) as total ..."} | True    |               | {"total": 2}   | info     | test_db.source_table| 2024-05-25 16:57:34 | validation_20240525 | 0.5             | batch_20240525   | mock_datasource  | mock_dataset | default_suite          |
+| table_name | execution_date     | validation_id   | metric_set_name | metric_name         | metric_value        |
+|------------|--------------------|-----------------|-----------------|---------------------|---------------------|
+| test_table | 2024-06-09 15:09:55| validation_12345| test_metrics    | accuracy_age        | 0.96                |
+| test_table | 2024-06-09 15:09:55| validation_12345| test_metrics    | completeness_name   | 1.0                 |
+| test_table | 2024-06-09 15:09:55| validation_12345| test_metrics    | age_range_check     | 1                   |
 ```
-
-#### Great Expectations Result
-
-```plaintext
-| expectation_type                 | kwargs                               | success | error_message | observed_value | severity | table_name         | execution_date      | validation_id      | validation_time | batch_id         | datasource_name  | dataset_name | expectation_suite_name |
-|----------------------------------|--------------------------------------|---------|---------------|----------------|----------|---------------------|---------------------|--------------------|-----------------|------------------|------------------|--------------|------------------------|
-| expect_column_to_exist           | {"column": "name"}                   | True    |               |                | info     | test_db.source_table| 2024-05-25 16:57:34 | validation_20240525 | 0.3             | batch_20240525   | mock_datasource  | mock_dataset | default_suite          |
-| expect_column_values_to_not_be_null | {"column": "age"}                | True    |               |                | info     | test_db.source_table| 2024-05-25 16:57:34 | validation_20240525 | 0.3             | batch_20240525   | mock_datasource  | mock_dataset | default_suite          |
-```
-
-### Logging and Error Handling
-
-Sentinel provides detailed logging to help you understand the validation process and quickly identify any issues. In case of an error, the details are logged, and an error message is saved to the target table.
-
-### Example Log Output
-
-```
-2024-05-24 10:54:35,847 | INFO | Starting validation                            
-2024-05-24 10:54:35,847 | ERROR | An error occurred during execution! Please consult table test_db.result_table for more information.
-2024-05-24 10:54:35,848 | ERROR | 'dict' object has no attribute 'great_expectations'
-```
-
-### Error Handling
-
-If any expectation fails, Sentinel raises a `ValidationError` and logs the error message. The error message provides details on the cause of the failure and suggests consulting the target table for more information.
 
 ## Testing
 
@@ -196,5 +281,3 @@ We welcome contributions to Sentinel! Please fork the repository and submit a pu
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----

@@ -10,7 +10,6 @@ Este documento descreve a arquitetura proposta para a implementação de um sist
 - Monitoramento contínuo de anomalias e mudanças no comportamento dos dados usando modelos de machine learning e estatísticas.
 - ~~Integração com Great Expectations para validações complexas e detalhadas dos dados.~~
 - Gestão robusta de metadados que inclui histórico, fonte e descrição dos dados.
-- Verificações regulares de consistência e conformidade com os padrões internos.
 - Dashboards de monitoramento para exibição de indicadores de qualidade de dados em tempo real.
 - Possibilidade de desabilitar jobs críticos com a percepção da queda de qualidade dos dados.
 - Categorização dos níveis de criticidade das validações.
@@ -21,6 +20,7 @@ Este documento descreve a arquitetura proposta para a implementação de um sist
 - Incluir templates de notificações com Jinja.
 - Incluir notificações via e-mail, Teams e REST.
 - Envio dos relatórios de qualidade por email.
+- ~~Criação e validação de métricas~~
 
 ### Should Have:
 - Integração com sistemas de notificação para alertas em tempo real sobre problemas de qualidade de dados.

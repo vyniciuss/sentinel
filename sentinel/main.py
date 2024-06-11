@@ -32,7 +32,7 @@ def main(
     ),
     metric_set_name: Optional[str] = Option(None, help='Metrics set name'),
     custom_expectation_name: Optional[str] = Option(
-        None, help='Metrics set name'
+        None, help='Custom expectation name'
     ),
 ):
     try:

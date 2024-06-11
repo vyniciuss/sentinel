@@ -125,24 +125,51 @@ def setup_data(spark):
 @pytest.fixture
 def mock_config():
     return DataQualityConfig(
-        great_expectations=[
+        greatExpectations=[
             {
-                'expectation_type': 'expect_column_to_exist',
+                'expectationType': 'expect_column_to_exist',
                 'kwargs': {'column': 'name'},
             },
             {
-                'expectation_type': 'expect_column_values_to_not_be_null',
+                'expectationType': 'expect_column_values_to_not_be_null',
                 'kwargs': {'column': 'age'},
             },
             {
-                'expectation_type': 'expect_column_values_to_be_in_set',
+                'expectationType': 'expect_column_values_to_be_in_set',
                 'kwargs': {
                     'column': 'status',
                     'value_set': ['single', 'married', 'divorced'],
                 },
             },
         ],
-        custom_expectations=[],
+        customExpectations=[
+            {
+                'name': 'validation1',
+                'expectations': [
+                    {
+                        'name': 'total_custom',
+                        'sql': 'SELECT CASE WHEN COUNT(*) = 2 THEN 1 ELSE 0 END as validation_result from test_db.source_table where age=45',
+                    }
+                ],
+            },
+            {
+                'name': 'validation2',
+                'expectations': [
+                    {
+                        'name': 'total_custom1',
+                        'sql': 'SELECT CASE WHEN COUNT(*) = 2 THEN 1 ELSE 0 END as validation_result from test_db.source_table where age=45',
+                    },
+                    {
+                        'name': 'total_custom2',
+                        'sql': "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END as validation_result from test_db.source_table where name = 'Alice' and status = 'single'",
+                    },
+                    {
+                        'name': 'total_custom3',
+                        'sql': "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END as validation_result from test_db.source_table where name = 'Alice' and status = 'married'",
+                    },
+                ],
+            },
+        ],
     )
 
 

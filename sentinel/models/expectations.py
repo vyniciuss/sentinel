@@ -28,11 +28,40 @@ class CustomExpectation(BaseModel):
         arbitrary_types_allowed = True
 
 
+class CustomExpectationGroup(BaseModel):
+    name: str
+    expectations: List[CustomExpectation]
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
 class DataQualityConfig(BaseModel):
     great_expectations: Optional[List[Expectations]] = Field(
         None, alias='greatExpectations'
     )
-    custom_expectations: Optional[List[CustomExpectation]] = Field(
+    custom_expectations: Optional[List[CustomExpectationGroup]] = Field(
         None, alias='customExpectations'
     )
     metrics_config: List[MetricSet] = Field(default_factory=list)
+
+    def find_custom_expectation_group(
+        self, group_name: str
+    ) -> Optional[CustomExpectationGroup]:
+        """
+        Find a custom expectation group by name.
+
+        Args:
+            group_name (str): The name of the group to find.
+
+        Returns:
+            Optional[CustomExpectationGroup]: The found custom expectation group or None.
+        """
+        return next(
+            (
+                group
+                for group in self.custom_expectations
+                if group.name == group_name
+            ),
+            None,
+        )

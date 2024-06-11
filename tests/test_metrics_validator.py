@@ -111,7 +111,10 @@ def test_generate_and_save_metrics(spark, setup_data, file_path):
 
     config = read_config_file(file_path, spark)
     generate_and_save_metrics(
-        config.data_quality, 'test_db.source_table', spark, 'test_db.result_table'
+        config.data_quality,
+        'test_db.source_table',
+        spark,
+        'test_db.result_table',
     )
     result_df = spark.table('test_db.result_table_metrics')
     result_df.show()

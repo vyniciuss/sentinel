@@ -23,6 +23,7 @@ def evaluate_all(
     checkpoint: Optional[str],
     metric_set_name: Optional[str] = None,
     spark: Optional[SparkSession] = None,
+    custom_expectation_name: Optional[str] = None,
 ):
     """
     Executes data validation according to the provided configuration.
@@ -65,6 +66,7 @@ def evaluate_all(
                     source_table_name,
                     target_table,
                     metric_set_name,
+                    custom_expectation_name,
                 )
             )
             .option('checkpointLocation', checkpoint)
@@ -78,6 +80,7 @@ def create_process_batch(
     source_table_name: str,
     target_table: str,
     metric_set_name: Optional[str],
+    custom_expectation_name: Optional[str],
 ):
     def process_batch(batch_df, batch_id):
         logger.info(f'Processing batch {batch_id}')
@@ -89,6 +92,7 @@ def create_process_batch(
             target_table,
             batch_df,
             metric_set_name,
+            custom_expectation_name,
         )
 
     return process_batch
@@ -101,6 +105,7 @@ def validate_data(
     target_table: str,
     dataframe: DataFrame,
     metric_set_name: Optional[str],
+    custom_expectation_name: Optional[str] = None,
 ) -> bool:
     """
     Performs data validation using both Great Expectations and custom validations.
@@ -114,7 +119,6 @@ def validate_data(
 
     Raises:
         ValidationError: If any validation fails.
-
     """
     logger.info('Starting validation')
 
@@ -126,8 +130,23 @@ def validate_data(
         spark, dataframe, expectation_suite, source_table_name
     )
 
+    custom_expectations = []
+    if custom_expectation_name:
+        custom_expectation = config.data_quality.find_custom_expectation_group(
+            custom_expectation_name
+        )
+        if custom_expectation:
+            custom_expectations = custom_expectation.expectations
+        else:
+            raise ValidationError(
+                f"Custom expectation '{custom_expectation_name}' not found."
+            )
+    else:
+        for group in config.data_quality.custom_expectations:
+            custom_expectations.extend(group.expectations)
+
     custom_results_df, custom_success = validate_custom_expectations(
-        spark, config.data_quality.custom_expectations, source_table_name
+        spark, custom_expectations, source_table_name
     )
 
     final_result_df = result_df

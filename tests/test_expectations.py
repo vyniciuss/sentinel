@@ -11,7 +11,7 @@ from sentinel.utils.utils import read_config_file
 
 def test_great_expectation_validation(spark, file_path):
     json_path = file_path
-    table_name = 'contas'
+    table_name = 'test_db.source_table'
     config = read_config_file(json_path, spark)
     expectation_suite = create_expectation_suite(
         config.data_quality.great_expectations
@@ -35,18 +35,34 @@ def test_great_expectation_validation(spark, file_path):
     assert total == 1
 
 
-def test_validate_custom_expectations(spark, setup_data):
-    custom_expectations = [
-        CustomExpectation(
-            name='test_expectation',
-            sql='SELECT CASE WHEN COUNT(*) = 2 THEN 1 ELSE 0 END as validation_result from test_db.source_table where age=45',
+def test_custom_expectation_group_validation(spark, file_path, setup_data):
+    json_path = file_path
+    table_name = 'test_db.source_table'
+    config = read_config_file(json_path, spark)
+    custom_expectation_group_name = 'validation2'
+
+    custom_expectation_group = (
+        config.data_quality.find_custom_expectation_group(
+            custom_expectation_group_name
         )
-    ]
-    source_table_name = 'test_db.source_table'
-    result_df, success = validate_custom_expectations(
-        spark, custom_expectations, source_table_name
     )
-    result_df.show()
+    custom_expectations = custom_expectation_group.expectations
+
+    data = [
+        ('Alice', 30, 'single'),
+        ('Alice', 30, 'married'),
+        ('Bob', 45, 'married'),
+        ('Charlie', 45, 'divorced'),
+    ]
+
+    columns = ['name', 'age', 'status']
+    df = spark.createDataFrame(data, columns)
+    df.show(truncate=False)
+    result_df, success = validate_custom_expectations(
+        spark, custom_expectations, table_name
+    )
+    logger.info(success)
+    result_df.show(truncate=False)
     assert success is True
 
 

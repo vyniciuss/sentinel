@@ -30,7 +30,10 @@ def main(
     checkpoint: str = Option(
         ..., help='Path to the checkpoint directory for Spark'
     ),
-    metric_set_name: Optional[str] = Option(None, help='Metrics set name')
+    metric_set_name: Optional[str] = Option(None, help='Metrics set name'),
+    custom_expectation_name: Optional[str] = Option(
+        None, help='Metrics set name'
+    ),
 ):
     try:
         logger.info(
@@ -53,6 +56,7 @@ def main(
             source_config_name=source_config_name,
             checkpoint=checkpoint,
             metric_set_name=metric_set_name,
+            custom_expectation_name=custom_expectation_name,
         )
         evaluate_all(
             json_path,
@@ -62,6 +66,7 @@ def main(
             source_config_name,
             checkpoint=checkpoint,
             metric_set_name=metric_set_name,
+            custom_expectation_name=custom_expectation_name,
         )
         sys.exit(0)
     except ValidationError as e:

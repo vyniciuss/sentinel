@@ -38,6 +38,8 @@ def test_full_validation_process(
             f'{checkpoint}\\process_{uuid.uuid4()}',
             '--metric-set-name',
             'basic_metrics',
+            '--custom-expectation-name',
+            'validation2',
         ],
         catch_exceptions=False,
     )
@@ -74,8 +76,8 @@ def test_full_validation_streaming_process(
             'tableA',
             '--checkpoint',
             f'{checkpoint}\\process_{uuid.uuid4()}',
-            # '--metric-set-name',
-            # 'basic_metrics',
+            '--custom-expectation-name',
+            'validation2',
         ],
         catch_exceptions=False,
     )
@@ -85,6 +87,8 @@ def test_full_validation_streaming_process(
 def extract_and_display_metrics(
     spark: SparkSession, target_table_name: str
 ) -> DataFrame:
+    spark.catalog.clearCache()
+    spark.sql('REFRESH TABLE test_db.source_table')
     metrics_df = spark.table(target_table_name)
     metrics_df = metrics_df.withColumn(
         'metrics_exploded',
@@ -109,7 +113,12 @@ def test_create_process_batch(spark, setup_data, file_path):
 
     config = read_config_file(file_path, spark)
     process_batch = create_process_batch(
-        spark, config, 'test_db.source_table', 'test_db.result_table', None
+        spark,
+        config,
+        'test_db.source_table',
+        'test_db.result_table',
+        None,
+        None,
     )
     process_batch(spark.table('test_db.source_table'), 0)
     result_df = spark.table('test_db.result_table')

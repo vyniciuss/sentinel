@@ -37,15 +37,21 @@ def generate_metrics_query(
         for condition in conditions:
             column_name = condition.column_name
             condition_query = condition.condition
+            escaped_condition_query = repr(condition_query)
             select_statements.append(
-                f'SUM(CASE WHEN {condition_query} THEN 1 ELSE 0 END) / COUNT(*) AS {column_name}'
+                f'SUM(CASE WHEN {condition_query} THEN 1 ELSE 0 END) / COUNT(*) AS {column_name}, '
+                f"'metric' AS source_type_{column_name}, "
+                f'{escaped_condition_query} AS condition_{column_name}'
             )
 
     for rule in metric_set.validation_rules:
         validation_column = f'{rule.name}_validation'
         condition = rule.condition
+        escaped_condition = repr(condition)
         select_statements.append(
-            f'CASE WHEN {condition} THEN 1 ELSE 0 END AS {validation_column}'
+            f'CASE WHEN {condition} THEN 1 ELSE 0 END AS {validation_column}, '
+            f"'validation_rule' AS source_type_{validation_column}, "
+            f'{escaped_condition} AS condition_{validation_column}'
         )
 
     metrics_query = f"SELECT {', '.join(select_statements)} FROM {source_table_name} {group_by_clause}"
@@ -60,7 +66,7 @@ def save_metrics(
     validation_id: str,
     target_table_name: str,
     metric_set_name: str,
-    metric_set_id: str,
+    metric_run_id: str,
 ) -> None:
     """
     Save metrics to the target table in Delta format.
@@ -76,7 +82,7 @@ def save_metrics(
         validation_id (str): The unique identifier for the validation run.
         target_table_name (str): The name of the target table where the metrics will be saved.
         metric_set_name (str): The name of the metric set used.
-        metric_set_id (str): The unique identifier for the metric set.
+        metric_run_id (str): The unique identifier for the metric set.
     """
     metrics_df = metrics_df.withColumn(
         'metrics', F.to_json(F.struct(*metrics_df.columns))
@@ -84,7 +90,7 @@ def save_metrics(
     metrics_df = metrics_df.withColumn('table_name', F.lit(table_name))
     metrics_df = metrics_df.withColumn('execution_date', F.lit(execution_date))
     metrics_df = metrics_df.withColumn('validation_id', F.lit(validation_id))
-    metrics_df = metrics_df.withColumn('metric_set_id', F.lit(metric_set_id))
+    metrics_df = metrics_df.withColumn('metric_run_id', F.lit(metric_run_id))
     metrics_df = metrics_df.withColumn(
         'metric_set_name', F.lit(metric_set_name)
     )
@@ -93,7 +99,7 @@ def save_metrics(
         'table_name',
         'execution_date',
         'validation_id',
-        'metric_set_id',
+        'metric_run_id',
         'metric_set_name',
         'metrics',
     )

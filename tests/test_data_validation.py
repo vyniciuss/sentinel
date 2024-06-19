@@ -90,27 +90,47 @@ def extract_and_display_metrics(
     spark.catalog.clearCache()
     spark.sql('REFRESH TABLE test_db.source_table')
     metrics_df = spark.table(target_table_name)
+
     metrics_df = metrics_df.withColumn(
         'metrics_exploded',
         F.explode(
             F.map_entries(F.from_json(F.col('metrics'), 'map<string, string>'))
         ),
     )
-    exploded_df = metrics_df.select(
+
+    base_columns = [
         'table_name',
         'execution_date',
         'validation_id',
         'metric_set_name',
+        'metric_run_id',
+    ]
+
+    dynamic_columns = [
         F.col('metrics_exploded.key').alias('metric_name'),
         F.col('metrics_exploded.value').alias('metric_value'),
-    )
-    exploded_df.show(10, truncate=False)
-    return exploded_df
+    ]
+
+    for col in metrics_df.columns:
+        if col.startswith('source_type_'):
+            dynamic_columns.append(
+                F.col(col).alias(f'source_type_{col.split("_")[-1]}')
+            )
+        if col.startswith('condition_'):
+            dynamic_columns.append(
+                F.col(col).alias(f'condition_{col.split("_")[-1]}')
+            )
+
+    final_df = metrics_df.select(*base_columns, *dynamic_columns)
+
+    final_df.show(100, truncate=False)
+    return final_df
 
 
 def test_create_process_batch(spark, setup_data, file_path):
     from sentinel.utils.utils import read_config_file
 
+    spark.sql('REFRESH TABLE test_db.source_table')
     config = read_config_file(file_path, spark)
     process_batch = create_process_batch(
         spark,

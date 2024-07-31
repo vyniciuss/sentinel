@@ -13,9 +13,10 @@ def test_great_expectation_validation(spark, file_path):
     json_path = file_path
     table_name = 'test_db.source_table'
     config = read_config_file(json_path, spark)
-    expectation_suite = create_expectation_suite(
-        config.data_quality.great_expectations
-    )
+    expectations = list()
+    for ge in config.data_quality.great_expectations:
+        expectations.extend(ge.expectations)
+    expectation_suite = create_expectation_suite(expectations)
     data = [
         ('Alice', 30, 'single'),
         ('Bob', 45, 'married'),

@@ -24,6 +24,7 @@ def evaluate_all(
     metric_set_name: Optional[str] = None,
     spark: Optional[SparkSession] = None,
     custom_expectation_name: Optional[str] = None,
+    expectation_name: Optional[str] = None,
 ):
     """
     Executes data validation according to the provided configuration.
@@ -50,7 +51,14 @@ def evaluate_all(
         logger.info(f'Batch reader created {source_table_name}')
         df = spark.table(source_table_name)
         validate_data(
-            spark, config, source_table_name, target_table, df, metric_set_name
+            spark,
+            config,
+            source_table_name,
+            target_table,
+            df,
+            metric_set_name,
+            custom_expectation_name,
+            expectation_name,
         )
     else:
         logger.info(f'Streaming reader created {source_table_name}')
@@ -67,6 +75,7 @@ def evaluate_all(
                     target_table,
                     metric_set_name,
                     custom_expectation_name,
+                    expectation_name,
                 )
             )
             .option('checkpointLocation', checkpoint)
@@ -81,6 +90,7 @@ def create_process_batch(
     target_table: str,
     metric_set_name: Optional[str],
     custom_expectation_name: Optional[str],
+    expectation_name: Optional[str],
 ):
     def process_batch(batch_df, batch_id):
         logger.info(f'Processing batch {batch_id}')
@@ -93,6 +103,7 @@ def create_process_batch(
             batch_df,
             metric_set_name,
             custom_expectation_name,
+            expectation_name,
         )
 
     return process_batch
@@ -106,6 +117,7 @@ def validate_data(
     dataframe: DataFrame,
     metric_set_name: Optional[str],
     custom_expectation_name: Optional[str] = None,
+    expectation_group_name: Optional[str] = None,
 ) -> bool:
     """
     Performs data validation using both Great Expectations and custom validations.
@@ -120,30 +132,20 @@ def validate_data(
     Raises:
         ValidationError: If any validation fails.
     """
+
     logger.info('Starting validation')
 
-    expectation_suite = create_expectation_suite(
-        config.data_quality.great_expectations
+    expectation_suite = get_ge_expectations_to_process(
+        config, expectation_group_name
     )
 
     result_df, ge_success = validate_great_expectations(
         spark, dataframe, expectation_suite, source_table_name
     )
 
-    custom_expectations = []
-    if custom_expectation_name:
-        custom_expectation = config.data_quality.find_custom_expectation_group(
-            custom_expectation_name
-        )
-        if custom_expectation:
-            custom_expectations = custom_expectation.expectations
-        else:
-            raise ValidationError(
-                f"Custom expectation '{custom_expectation_name}' not found."
-            )
-    else:
-        for group in config.data_quality.custom_expectations:
-            custom_expectations.extend(group.expectations)
+    custom_expectations = get_custom_expectation_to_process(
+        config, custom_expectation_name
+    )
 
     custom_results_df, custom_success = validate_custom_expectations(
         spark, custom_expectations, source_table_name
@@ -170,3 +172,35 @@ def validate_data(
             f'An error occurred during execution! Please consult '
             f'table {target_table} for more information.'
         )
+
+
+def get_ge_expectations_to_process(config, expectation_group_name):
+    ge_expectations = list()
+    if expectation_group_name:
+        expectation_group = config.data_quality.find_expectation_group(
+            expectation_group_name
+        )
+        ge_expectations.extend(expectation_group.expectations)
+    else:
+        great_expectations = config.data_quality.great_expectations
+        for ge in great_expectations:
+            ge_expectations.extend(ge.expectations)
+    expectation_suite = create_expectation_suite(ge_expectations)
+    return expectation_suite
+
+
+def get_custom_expectation_to_process(config, custom_expectation_name):
+    custom_expectations = []
+    if custom_expectation_name:
+        custom_expectation = config.data_quality.find_custom_expectation_group(
+            custom_expectation_name
+        )
+        if not custom_expectation:
+            raise ValidationError(
+                f"Custom expectation '{custom_expectation_name}' not found."
+            )
+        custom_expectations = custom_expectation.expectations
+    else:
+        for group in config.data_quality.custom_expectations:
+            custom_expectations.extend(group.expectations)
+    return custom_expectations

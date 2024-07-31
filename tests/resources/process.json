@@ -48,27 +48,32 @@
   "dataQuality": {
     "greatExpectations": [
       {
-        "expectationType": "expect_column_to_exist",
-        "kwargs": {
-          "column": "name"
-        }
-      },
-      {
-        "expectationType": "expect_column_values_to_not_be_null",
-        "kwargs": {
-          "column": "age"
-        }
-      },
-      {
-        "expectationType": "expect_column_values_to_be_in_set",
-        "kwargs": {
-          "column": "status",
-          "value_set": [
-            "single",
-            "married",
-            "divorced"
-          ]
-        }
+        "name": "teste",
+        "expectations": [
+          {
+            "expectationType": "expect_column_to_exist",
+            "kwargs": {
+              "column": "name"
+            }
+          },
+          {
+            "expectationType": "expect_column_values_to_not_be_null",
+            "kwargs": {
+              "column": "age"
+            }
+          },
+          {
+            "expectationType": "expect_column_values_to_be_in_set",
+            "kwargs": {
+              "column": "status",
+              "value_set": [
+                "single",
+                "married",
+                "divorced"
+              ]
+            }
+          }
+        ]
       }
     ],
     "customExpectations": [

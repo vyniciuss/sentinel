@@ -34,6 +34,7 @@ def main(
     custom_expectation_name: Optional[str] = Option(
         None, help='Custom expectation name'
     ),
+    expectation_name: Optional[str] = Option(None, help='Expectation name'),
 ):
     try:
         logger.info(
@@ -57,6 +58,7 @@ def main(
             checkpoint=checkpoint,
             metric_set_name=metric_set_name,
             custom_expectation_name=custom_expectation_name,
+            expectation_name=expectation_name,
         )
         evaluate_all(
             json_path,
@@ -67,6 +69,7 @@ def main(
             checkpoint=checkpoint,
             metric_set_name=metric_set_name,
             custom_expectation_name=custom_expectation_name,
+            expectation_name=expectation_name,
         )
         sys.exit(0)
     except ValidationError as e:

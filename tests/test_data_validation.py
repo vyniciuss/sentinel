@@ -40,6 +40,8 @@ def test_full_validation_process(
             'basic_metrics',
             '--custom-expectation-name',
             'validation2',
+            '--expectation-name',
+            'teste',
         ],
         catch_exceptions=False,
     )
@@ -78,6 +80,8 @@ def test_full_validation_streaming_process(
             f'{checkpoint}\\process_{uuid.uuid4()}',
             '--custom-expectation-name',
             'validation2',
+            '--expectation-name',
+            'teste',
         ],
         catch_exceptions=False,
     )
@@ -137,6 +141,7 @@ def test_create_process_batch(spark, setup_data, file_path):
         config,
         'test_db.source_table',
         'test_db.result_table',
+        None,
         None,
         None,
     )

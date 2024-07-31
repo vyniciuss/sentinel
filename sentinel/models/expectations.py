@@ -6,12 +6,19 @@ from sentinel.models.metrics import MetricSet
 
 
 class Expectations(BaseModel):
-
     expectation_type: Optional[str] = Field(None, alias='expectationType')
     kwargs: Optional[Dict[str, Any]] = None
     level: Optional[str] = None
     description: Optional[str] = None
     type: Optional[str] = None
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class ExpectationGroup(BaseModel):
+    name: str
+    expectations: List[Expectations]
 
     class Config:
         arbitrary_types_allowed = True
@@ -37,7 +44,7 @@ class CustomExpectationGroup(BaseModel):
 
 
 class DataQualityConfig(BaseModel):
-    great_expectations: Optional[List[Expectations]] = Field(
+    great_expectations: Optional[List[ExpectationGroup]] = Field(
         None, alias='greatExpectations'
     )
     custom_expectations: Optional[List[CustomExpectationGroup]] = Field(
@@ -61,6 +68,27 @@ class DataQualityConfig(BaseModel):
             (
                 group
                 for group in self.custom_expectations
+                if group.name == group_name
+            ),
+            None,
+        )
+
+    def find_expectation_group(
+        self, group_name: str
+    ) -> Optional[ExpectationGroup]:
+        """
+        Find a custom expectation group by name.
+
+        Args:
+            group_name (str): The name of the group to find.
+
+        Returns:
+            Optional[CustomExpectationGroup]: The found custom expectation group or None.
+        """
+        return next(
+            (
+                group
+                for group in self.great_expectations
                 if group.name == group_name
             ),
             None,

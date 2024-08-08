@@ -1,3 +1,5 @@
+import os
+
 from sentinel.config.logging_config import logger
 from sentinel.data_quality.expectations_validator import (
     create_expectation_suite,
@@ -36,8 +38,10 @@ def test_great_expectation_validation(spark, file_path):
     assert total == 1
 
 
-def test_custom_expectation_group_validation(spark, file_path, setup_data):
-    json_path = file_path
+def test_custom_expectation_group_validation(spark, setup_data):
+    json_path = os.path.join(
+        os.path.dirname(__file__), 'resources', 'custom_validation.json'
+    )
     table_name = 'test_db.source_table'
     config = read_config_file(json_path, spark)
     custom_expectation_group_name = 'validation2'

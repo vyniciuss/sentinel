@@ -94,7 +94,7 @@ def validate_custom_expectations(
 
     records = []
     custom_success = True
-
+    start_execution = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     for expectation in custom_expectations:
         validation_id = (
             f"validation_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -103,8 +103,9 @@ def validate_custom_expectations(
         sql_query = expectation.sql
         logger.info(sql_query)
         start_time = time.time()
+
         result_df = spark.sql(sql_query)
-        success = result_df.filter(F.col('validation_result') == 1).count() > 0
+        success = result_df.count() > 0
         validation_time = time.time() - start_time
 
         record = {
@@ -127,11 +128,65 @@ def validate_custom_expectations(
 
         if not success:
             custom_success = False
-
+    # TODO implement notification
+    metrics_to_send_by_notification = (
+        generate_metrics_from_custom_expectations(
+            records, source_table_name, start_execution
+        )
+    )
     schema = generate_target_schema()
-
     result_df = spark.createDataFrame(records, schema)
+
     return result_df, custom_success
+
+
+def generate_metrics_from_custom_expectations(
+    records, source_table_name, start_execution
+):
+    """
+    Generates metrics from custom data quality expectations.
+
+    This function calculates the total number of successful and unsuccessful records
+    from a list of records, and returns a dictionary containing various validation metrics.
+
+    Args:
+        records (list): List of dictionaries representing records, where each
+                        record must contain a 'success' key indicating the validation result.
+        source_table_name (str): Name of the source table being validated.
+        start_execution (str): The start execution timestamp of the validation.
+
+    Returns:
+        dict: A dictionary containing the following metrics:
+            - total_success (int): Total number of successful records.
+            - total_unsuccess (int): Total number of unsuccessful records.
+            - percent_success (str): Percentage of successful records.
+            - total_records (int): Total number of records processed.
+            - validation_status (str): Overall validation status ('Successful' or 'Failure').
+            - table_validated (str): Name of the source table being validated.
+            - validation_type (str): Type of validation performed.
+            - execution_date (str): Execution date of the validation.
+    """
+    total_succes = 0
+    total_unsucces = 0
+    total_records = len(records)
+    for record in records:
+        if record['success']:
+            total_succes = total_succes + 1
+        else:
+            total_unsucces = total_unsucces + 1
+    result = {
+        'total_succes': total_succes,
+        'total_unsucces': total_unsucces,
+        'percent_sucess': f'{round((total_succes / total_records) * 100, 2)}%',
+        'total_records': total_records,
+        'validation_status': 'Sucessfull'
+        if total_unsucces == 0
+        else 'Failure',
+        'table_validated': source_table_name,
+        'validation_type': 'Data Quality Custom Check',
+        'execution_date': start_execution,
+    }
+    return result
 
 
 def generate_target_schema() -> StructType:
